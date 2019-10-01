@@ -180,16 +180,17 @@ for i in range(0, numGames):
         #d.printRemainingDeck() #Prints the remaining cards
         
         #deduct blinds
-        if(currentGame.listOfPlayers[(currentGame.currentDealer+1)%8].playerMoney>0):
-            currentGame.listOfPlayers[(currentGame.currentDealer+1)%8].modMoney(-currentGame.smallBlind)
-            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%8]+=currentGame.smallBlind
+        numCurPlayers = len(currentGame.listOfPlayers)
+        if(currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].playerMoney>0):
+            currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
+            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%numCurPlayers]+=currentGame.smallBlind
             
-        if(currentGame.listOfPlayers[(currentGame.currentDealer+2)%8].playerMoney>0):
-            currentGame.listOfPlayers[(currentGame.currentDealer+2)%8].modMoney(-currentGame.bigBlind)
-            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%8]+=currentGame.bigBlind
+        if(currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].playerMoney>0):
+            currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
+            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
             
         # 1) Loop through players and get actions until allBetsEqual
-        #start at (currentDealer+3)%8 and loop asking for actions.
+        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
         for q in range(0, 8):
             print("Get the action from player and update gamestate")
             #playerAction = listOfPlayers[(q+currentDealer+3)%8].getAction(currentGamestate) #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc
@@ -226,5 +227,7 @@ for i in range(0, numGames):
         #This should be the code that evaluates the strength of each player's hand, awards money to winner
         #Assign all players a reward equal to the amount of money they won - the amount of money they bet
         
+        #If a player has no more money left, remove them from the list of players for this game
+        
         #last part of resolving is to increment the dealer
-        currentGame.currentDealer = (currentGame.currentDealer + 1)%8
+        currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
