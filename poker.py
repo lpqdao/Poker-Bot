@@ -93,6 +93,16 @@ class Game:
     def setNewRound(self, incRound):
         self.currentRound = incRound
 
+    def implementAction(self, incAction):
+        print("We did something")
+        #Here is where we take the action sent to us by the player, implement it into the game
+
+
+    def getGameState(self):
+        #Here we should have some code to return a gamestate class. Maybe the game itself? Maybe we delete this function and just pass the game
+        # TBD
+        return 0
+
 
         
 
@@ -193,10 +203,11 @@ for i in range(0, numGames):
         #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
         for q in range(0, 8):
             print("Get the action from player and update gamestate")
+            #if q.inactive = False
             #playerAction = listOfPlayers[(q+currentDealer+3)%8].getAction(currentGamestate) #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc
 
             #print("Implement the action from the player")
-            #implementAction(playerAction) #implement the action in the game engine // If the action is invalid, the player folds
+            #currentGame.implementAction(playerAction) #implement the action in the game engine // If the action is invalid, the player folds
             #this updates the gamestate for the next player before it loops
                 
 
@@ -229,5 +240,11 @@ for i in range(0, numGames):
         
         #If a player has no more money left, remove them from the list of players for this game
         
+        #If only one player left in the list of players, break out of the loop andend the game
+        if (len(currentGame.listOfPlayers) == 1):
+            break
+        
         #last part of resolving is to increment the dealer
         currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
+
+    #HERE IS THE END OF THIS GAME
