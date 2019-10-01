@@ -93,7 +93,7 @@ class Game:
     def setNewRound(self, incRound):
         self.currentRound = incRound
 
-    def implementAction(self, incAction):
+    def implementAction(self, incAction, incPlayer):
         print("We did something")
         #Here is where we take the action sent to us by the player, implement it into the game
 
@@ -201,13 +201,15 @@ for i in range(0, numGames):
             
         # 1) Loop through players and get actions until allBetsEqual
         #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
-        for q in range(0, 8):
+        for q in range(0, numCurPlayers):
             print("Get the action from player and update gamestate")
             #if q.inactive = False
-            #playerAction = listOfPlayers[(q+currentDealer+3)%8].getAction(currentGamestate) #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc
+            
+            #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+            #playerAction = listOfPlayers[(q+currentDealer+3)%numCurPlayers].getAction(currentGamestate) 
 
             #print("Implement the action from the player")
-            #currentGame.implementAction(playerAction) #implement the action in the game engine // If the action is invalid, the player folds
+            #currentGame.implementAction(playerAction, currentPlayer) #implement the action in the game engine // If the action is invalid, the player folds
             #this updates the gamestate for the next player before it loops
                 
 
