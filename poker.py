@@ -7,6 +7,7 @@ class Player:
         self.holeCards = [] #create a list of for cards
         self.handRanking = [] #create a list to store the ints for hand rankings
         self.inactive = False
+        self.allIn = False
         #self.currentAI = (INSERT AN AI OBJECT)
 
     def setAI(self):
@@ -32,6 +33,10 @@ class Player:
     def modMoney(self, amount):
         self.playerMoney += amount
         print("Player now has $" + str(self.playerMoney))
+
+        def returnAction(self):
+            #for now it doesn't poll the AI for an action, it just returns a bet of 0.
+            return playerAction("B",0)
         
     
     
@@ -93,8 +98,82 @@ class Game:
     def setNewRound(self, incRound):
         self.currentRound = incRound
 
-    def implementAction(self, incAction, incPlayer):
+    def implementAction(self, incAction, incPlayer, incPlayerIndex):
         print("We did something")
+        incAct = incAction.actAction
+        if (incAct == "R"):
+            if (incPlayer.playerMoney >= incAction.actAmt):
+                #if player raised (like from 200 to 500) deduct what they currently have in pot and add total amount (they added +300)
+                self.currentRound.currentPot += incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]
+                #player's money is incremented by previous bet amount minus new raised amount (should be negative)
+                self.listOfPlayers[incPlayerIndex].playerMoney += (self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt)
+                #replace what they bet with their new maximum bet
+                self.currentRound.tempPlayerBets[incPlayerIndex] = incAction.actAmt
+                self.currentRound.maximumBet = incAction.actAmt
+            else:
+                #the player didn't have enough money for their action, action invalid, they fold.
+                #player is inactive for the remainder of the round
+                incPlayer.inactive = True
+                #player no longer has any bet standing in this hand
+                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+                
+        elif (incAct == "B"):
+            if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRount.maximumBet))):
+                #if player has enough money, and the amount is >= the max bet or is the first bet, then implement it
+
+                #increase the pot
+                self.currentRound.currentPot += incAction.actAmt
+
+                #increase player bet amount + deduct their bet from their money
+                self.listOfPlayers[incPlayerIndex].playerMoney -= incAction.actAmt
+                self.currentRound.tempPlayerBets[incPlayerIndex] += incAction.actAmt
+                
+                #set the new maximum bet if this is a new bet
+                if(self.currentRound.maximumBet == 0):
+                    self.currentRound.maximumBet = incAction.actAmt
+            else:
+                #player is inactive for the remainder of the round
+                incPlayer.inactive = True
+                #player no longer has any bet standing in this hand
+                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+        elif (incAct == "C"):
+            #if the player has enough money and the amount they entered is exactly equal to the maximum bet
+            if ((incPlayer.playerMoney >= incAction.actAmt) and (incAction.actAmt == self.currentRound.maximumBet)):
+                self.currentRound.currentPot += incAction.actAmt
+
+                #increase the player bet ammount and deduct their bet from their money
+                self.listOfPlayers[incPlayerIndex].playerMoney -= incAction.actAmt
+                self.currentRound.tempPlayerBets[incPlayerIndex] += incAction.actAmt
+
+                #max bet doesn't change in a call, so skip that
+            elif (incPlayer.playerMoney < self.currentRound.maximumBet):
+                #the player doesn't have enough to cover the max bet but is calling
+                ## PERFECT SIDEPOTS LATER
+                self.currentRound.currentPot += incPlayer.playerMoney
+                self.currentRound.tempPlayerBets[incPlayerIndex] += incPlayer.playerMoney
+                incPlayer.playerMoney = 0
+                incPlayer.allIn = True
+            else:
+                #player is inactive for the remainder of the round
+                incPlayer.inactive = True
+                #player no longer has any bet standing in this hand
+                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+        elif (incAct == "F"):
+            #player is inactive for the remainder of the round
+            incPlayer.inactive = True
+            #player no longer has any bet standing in this hand
+            self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+        else:
+            #unknown or invalid action, player folds.
+            #player is inactive for the remainder of the round
+            incPlayer.inactive = True
+            #player no longer has any bet standing in this hand
+            self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;            
+                
+                
+                
+            
+        #switch(incAction.actAction) 
         #Here is where we take the action sent to us by the player, implement it into the game
 
 
@@ -102,6 +181,7 @@ class Game:
         #Here we should have some code to return a gamestate class. Maybe the game itself? Maybe we delete this function and just pass the game
         # TBD
         return 0
+    
 
 
         
@@ -112,6 +192,8 @@ class Round:
         self.currentPot = 0
         self.deck = Deck()
         self.communityCards = []
+        #current betting round's (not hand's) maximum bet
+        self.maximumBet = 0
 
     def incrementPot(self, incomingBet):
         self.currentPot += incomingBet
@@ -132,8 +214,8 @@ class Round:
 class playerAction:
     actions = ["R", "B", "C", "F"]
     # R = Raise, should have a corresponding amount
-    # B = Bet, should have a corresponding amounr
-    # C = Check, corresponding amount = 0
+    # B = Bet, should have a corresponding amount, a check is a bet of 0
+    # C = Call, corresponding amount = unknown. Player can call with max(currentMaxBet, playerMoney) but if they don't have enough money, they only get the sidepot
     # F = Fold, corresponding amount = 0
 
     def __init__(self, incAction, incAmt):
@@ -146,8 +228,6 @@ class playerAction:
     
         
 
-#define a list to store the players
-listOfPlayers = []
 #Initialize the new tournament
 
 #how many games
@@ -156,15 +236,18 @@ numGames = 10
 #how many rounds per game
 numRoundsPerGame = 4
 
-#set player loop (1 to 8, if not specified, pick at random)
-for i in range(0, 8):
-    print("I have set player " + str(i))
-    #create 8 players
-    listOfPlayers.append(Player())
+
 
 
 #start the games +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 for i in range(0, numGames):
+    #define a list to store the current players
+    listOfPlayers = []
+    #set player loop (1 to 8, if not specified, pick at random)
+    for i in range(0, 8):
+        print("I have set player " + str(i))
+        #create 8 players
+        listOfPlayers.append(Player())
     currentGame = Game(listOfPlayers)
     
     #start the rounds ----------------------------------------------------------------------------------------
@@ -241,12 +324,16 @@ for i in range(0, numGames):
         #Assign all players a reward equal to the amount of money they won - the amount of money they bet
         
         #If a player has no more money left, remove them from the list of players for this game
+        for p in currentGame.listOfPlayers:
+            if (p.playerMoney <= 0):
+                currentGame.listOfPlayers.remove(p)
         
-        #If only one player left in the list of players, break out of the loop andend the game
+        #If only one player left in the list of players, break out of the loop and end the game
         if (len(currentGame.listOfPlayers) == 1):
             break
         
         #last part of resolving is to increment the dealer
         currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
 
+    #INSERT SOME CODE TO DELETE THE CURRENT GAME
     #HERE IS THE END OF THIS GAME
