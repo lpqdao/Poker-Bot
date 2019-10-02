@@ -2,13 +2,13 @@ import random
 
 class Player:
 
-    def __init__(self):
+    def __init__(self, typeOfAI):
         self.playerMoney = 10000
         self.holeCards = [] #create a list of for cards
         self.handRanking = [] #create a list to store the ints for hand rankings
         self.inactive = False
         self.allIn = False
-        #self.currentAI = (INSERT AN AI OBJECT)
+        self.currentAI = PlayerAI(self, typeOfAI);
 
     def setAI(self):
         print("Someone should have set the AI")
@@ -34,11 +34,68 @@ class Player:
         self.playerMoney += amount
         print("Player now has $" + str(self.playerMoney))
 
-        def returnAction(self):
-            #for now it doesn't poll the AI for an action, it just returns a bet of 0.
-            return playerAction("B",0)
+    def returnAction(self):
+        #for now it doesn't utilize the gamestate, though we should implement that
+        return self.currentAI.returnAction()
         
     
+
+class PlayerAI:
+    def __init__(self, parentPlayer, incName):
+        self.name = incName
+        self.parentPlayer = parentPlayer
+
+    #this will need to ultimately have access to the gamestate, either by adding it to the playerAI or directly as 
+    def returnAction(self):
+        if (self.name == "Default"):
+            #for now just tries to bet 0
+            return PlayerAction("B", 0)
+            #returnAction = PlayerAction("B", 0)
+            #return returnAction
+        elif (self.name == "Random"):
+            #CODE FOR RANDOM ACTIONS
+            intAction = random.randint(1,5)
+            if (intAction == 1):
+                print("WE WILL RAISE")
+                intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney)
+                return PlayerAction("R", intRaiseAmount)
+                #returnAction = PlayerAction("R", intRaiseAmount)
+                #return returnAction
+            
+            elif (intAction == 2):
+                print("WE WILL BET")
+                intBetAmount = random.randint(1, self.parentPlayer.playerMoney)
+                return PlayerAction("B", intBetAmount)
+
+                #returnAction = PlayerAction("B", intBetAmount)
+                #return returnAction
+            elif (intAction == 3):
+                print("WE WILL CALL")
+                intCallAmount = random.randint(1, self.parentPlayer.playerMoney)
+                return PlayerAction("C", intCallAmount)
+                #returnAction = PlayerAction("C", intCallAmount)
+                #return returnAction
+            elif (intAction == 4):
+                print ("WE WILL FOLD")
+                return PlayerAction("F", 0)
+                #returnAction = PlayerAction("F", 0)
+                #return returnAction
+            else:
+                return PlayerAction("F", 0)
+        elif (self.name == "Player"):
+            #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            #for now we just fold, because we have nothing
+            #returnAction = PlayerAction("F", 0)
+            #return returnAction
+            returnAction = PlayerAction("F", 0)
+
+            #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        else:
+            #DO RANDOM ACTIONS
+            #returnAction = PlayerAction("F", 0)
+            #return returnAction
+            return PlayerAction("F", 0)
+        
     
 class Card:
     suits = ["S", "C", "D", "H"]
@@ -118,7 +175,7 @@ class Game:
                 self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
                 
         elif (incAct == "B"):
-            if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRount.maximumBet))):
+            if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRound.maximumBet))):
                 #if player has enough money, and the amount is >= the max bet or is the first bet, then implement it
 
                 #increase the pot
@@ -135,15 +192,15 @@ class Game:
                 #player is inactive for the remainder of the round
                 incPlayer.inactive = True
                 #player no longer has any bet standing in this hand
-                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+                self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "C"):
             #if the player has enough money and the amount they entered is exactly equal to the maximum bet
-            if ((incPlayer.playerMoney >= incAction.actAmt) and (incAction.actAmt == self.currentRound.maximumBet)):
-                self.currentRound.currentPot += incAction.actAmt
+            if ((incPlayer.playerMoney >= incAction.actAmt) and (incAction.actAmt >= self.currentRound.maximumBet)):
+                self.currentRound.currentPot += self.currentRound.maximumBet
 
                 #increase the player bet ammount and deduct their bet from their money
-                self.listOfPlayers[incPlayerIndex].playerMoney -= incAction.actAmt
-                self.currentRound.tempPlayerBets[incPlayerIndex] += incAction.actAmt
+                self.listOfPlayers[incPlayerIndex].playerMoney -= self.currentRound.maximumBet
+                self.currentRound.tempPlayerBets[incPlayerIndex] += self.currentRound.maximumBet
 
                 #max bet doesn't change in a call, so skip that
             elif (incPlayer.playerMoney < self.currentRound.maximumBet):
@@ -157,18 +214,18 @@ class Game:
                 #player is inactive for the remainder of the round
                 incPlayer.inactive = True
                 #player no longer has any bet standing in this hand
-                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+                self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "F"):
             #player is inactive for the remainder of the round
             incPlayer.inactive = True
             #player no longer has any bet standing in this hand
-            self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+            self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         else:
             #unknown or invalid action, player folds.
             #player is inactive for the remainder of the round
             incPlayer.inactive = True
             #player no longer has any bet standing in this hand
-            self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;            
+            self.currentRound.tempPlayerBets[incPlayerIndex] = 0;            
                 
                 
                 
@@ -211,7 +268,7 @@ class Round:
 
     
 
-class playerAction:
+class PlayerAction:
     actions = ["R", "B", "C", "F"]
     # R = Raise, should have a corresponding amount
     # B = Bet, should have a corresponding amount, a check is a bet of 0
@@ -219,7 +276,7 @@ class playerAction:
     # F = Fold, corresponding amount = 0
 
     def __init__(self, incAction, incAmt):
-        if (incAction in actions):
+        if (incAction in self.actions):
             self.actAction = incAction
             self.actAmt = incAmt
         else:
@@ -246,8 +303,8 @@ for i in range(0, numGames):
     #set player loop (1 to 8, if not specified, pick at random)
     for i in range(0, 8):
         print("I have set player " + str(i))
-        #create 8 players
-        listOfPlayers.append(Player())
+        #create 8 players, ALL RANDOM FOR NOW
+        listOfPlayers.append(Player("Random"))
     currentGame = Game(listOfPlayers)
     
     #start the rounds ----------------------------------------------------------------------------------------
@@ -286,14 +343,19 @@ for i in range(0, numGames):
         #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
         for q in range(0, numCurPlayers):
             print("Get the action from player and update gamestate")
-            #if q.inactive = False
-            
-            #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
-            #playerAction = listOfPlayers[(q+currentDealer+3)%numCurPlayers].getAction(currentGamestate) 
-
-            #print("Implement the action from the player")
-            #currentGame.implementAction(playerAction, currentPlayer) #implement the action in the game engine // If the action is invalid, the player folds
-            #this updates the gamestate for the next player before it loops
+            standinForGamestate = []
+            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+                #print("Implement the action from the player")
+                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+                #implement the action in the game engine // If the action is invalid, the player folds
+                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+                #this updates the gamestate for the next player before it loops
+            else:
+                print("Player action skipped because player all in or out of game")
                 
 
             
@@ -322,9 +384,13 @@ for i in range(0, numGames):
         #resolve round + award money
         #This should be the code that evaluates the strength of each player's hand, awards money to winner
         #Assign all players a reward equal to the amount of money they won - the amount of money they bet
-        
+
+
+        #set all players to not inactive and not all in
         #If a player has no more money left, remove them from the list of players for this game
         for p in currentGame.listOfPlayers:
+            p.inactive = False
+            p.allIn = False
             if (p.playerMoney <= 0):
                 currentGame.listOfPlayers.remove(p)
         
@@ -335,5 +401,7 @@ for i in range(0, numGames):
         #last part of resolving is to increment the dealer
         currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
 
-    #INSERT SOME CODE TO DELETE THE CURRENT GAME
+    
     #HERE IS THE END OF THIS GAME
+    #There should be some code here to collect the final state of the game, such as the amount of money held by each player (could be 80,000 by 1, 0 by the rest, etc)
+    #INSERT SOME CODE TO DELETE THE CURRENT GAME
