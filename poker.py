@@ -9,7 +9,7 @@ class Player:
         self.handRanking = [] #create a list to store the ints for hand rankings
         self.inactive = False
         self.allIn = False
-        self.currentAI = PlayerAI(self, typeOfAI);
+        self.currentAI = PlayerAI(self, typeOfAI)
 
     def setAI(self):
         print("Someone should have set the AI")
@@ -71,7 +71,19 @@ class Player:
     def getSuitedness (self, incomingHand):
         #we should return a histogram of suitedness
         #declare a list/tuple with four slots
+        suitednessVector = [0] * 4
         #iterate through each of the 5 cards in the incoming hand
+        for h in incomingHand:
+            if (h.suit=="S"):
+                suitednessVector[0]+=1
+            elif (h.suit=="C"):
+                suitednessVector[1]+=1
+            elif (h.suit == "D"):
+                suitednessVector[1] += 1
+            elif (h.suit == "H"):
+                suitednessVector[1] += 1
+        return suitednessVector
+
         #for each card, increment the first element if spades, second if clubs, third if diamonds, fourth if hearts
         #return the list with the histogram
         return 0
@@ -79,9 +91,38 @@ class Player:
     def getPairedness (self, incomingHand):
         #We should return a histogram of pairedness
         #declare a list/tuple with 13 slots
+        pairednessVector = [0] * 13
         #iterate through each of the cards and increment the histogram bucket for each card (2 - A) -> (13 - 1)
+        for h in incomingHand:
+            if (h.value=="A"):
+                pairednessVector[0] +=1
+            elif (h.value=="K"):
+                pairednessVector[1]+=1
+            elif (h.value == "Q"):
+                pairednessVector[2] += 1
+            elif (h.value == "J"):
+                pairednessVector[3] += 1
+            elif (h.value == "T"):
+                pairednessVector[4] += 1
+            elif (h.value == "9"):
+                pairednessVector[5] += 1
+            elif (h.value == "8"):
+                pairednessVector[6] += 1
+            elif (h.value == "7"):
+                pairednessVector[7] += 1
+            elif (h.value == "6"):
+                pairednessVector[8] += 1
+            elif (h.value == "5"):
+                pairednessVector[9] += 1
+            elif (h.value == "4"):
+                pairednessVector[10] += 1
+            elif (h.value == "3"):
+                pairednessVector[11] += 1
+            elif (h.value == "2"):
+                pairednessVector[12] += 1
+
         #return the histogram
-        return 0
+        return pairednessVector
 
     def getHighCard(self, incomingHand, incPairedness, incOrder):
         #this should return the value of the value of the highest card matching the requested degree, -1 if no matches
@@ -90,7 +131,19 @@ class Player:
         #Example: Incoming hand: {K, K, Q, Q, 5}, pairedness = 2, order = 2 --> 3 (queen)
         #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 1 --> 2 (king) 
         #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 2 --> -1 (none)
-        return 0
+
+        pairednessVector = getPairedness(incomingHand)
+
+        currentOrder = 0
+        for c in range(0, 13):
+            if (pairednessVector[c] >= incPairedness):
+                currentOrder+=1
+            if (currentOrder == incOrder):
+                #return one more than i (if i = 0, we're on ace, so return value 1
+                return c+1
+
+
+        return -1
 
         
 
@@ -183,7 +236,7 @@ class Deck:
                 self.cards.append(Card(s, v))
         #print("Deck has been initialized")
 
-    def randomizeDeck():
+    def randomizeDeck(self):
         print("randomized")
     #insert Code to randomize the order of the deck
 
