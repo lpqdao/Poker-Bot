@@ -1,4 +1,5 @@
 import random
+import itertools
 
 class Player:
 
@@ -37,7 +38,63 @@ class Player:
     def returnAction(self):
         #for now it doesn't utilize the gamestate, though we should implement that
         return self.currentAI.returnAction()
+
+    
+
+    def returnBestHand(self, arrayOfCommunityCards):
+        print("Here we find the best hand that the player has")
+        allCards = arrayOfCommunityCards
+        for p in player.holeCards:
+            allCards.append(p)
         
+        #returns all possible combinations of 5 cards from the seven available.
+        if (len(allCards) >= 5):
+            #aka we have seen at least the flop
+            possibleHands = list(itertools.combinations(allCards, 5))
+        else:
+            #AKA if we still have only the hole cards, then there is only one possible combination of those two
+            possibleHands = list(itertools.combinations(allCards, 2))
+
+        for h in possibleHands:
+            #for each hand that is possibly the best, evaluate it and give it a ranking
+            intHandStraightedness = getStraightedness(h)
+        
+        
+    def getStraightedness(self, incomingHand):
+        #incoming hands should already be sorted if possible, but we should verify
+        
+        #sort the incoming hand
+        #check the straightedness
+        #return Straightedness
+        return 0
+
+    def getSuitedness (self, incomingHand):
+        #we should return a histogram of suitedness
+        #declare a list/tuple with four slots
+        #iterate through each of the 5 cards in the incoming hand
+        #for each card, increment the first element if spades, second if clubs, third if diamonds, fourth if hearts
+        #return the list with the histogram
+        return 0
+
+    def getPairedness (self, incomingHand):
+        #We should return a histogram of pairedness
+        #declare a list/tuple with 13 slots
+        #iterate through each of the cards and increment the histogram bucket for each card (2 - A) -> (13 - 1)
+        #return the histogram
+        return 0
+
+    def getHighCard(self, incomingHand, incPairedness, incOrder):
+        #this should return the value of the value of the highest card matching the requested degree, -1 if no matches
+        #Example: Incoming hand: {K, K, Q, Q, 5}, pairedness = 3, order = 1 --> -1 (none)
+        #Example: Incoming hand: {K, K, Q, Q, 5}, pairedness = 2, order = 1 --> 2 (king)
+        #Example: Incoming hand: {K, K, Q, Q, 5}, pairedness = 2, order = 2 --> 3 (queen)
+        #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 1 --> 2 (king) 
+        #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 2 --> -1 (none)
+        return 0
+
+        
+
+    #We now have all 7 cards in one list. Need to evaluate max pairedness, straightedness, and suitedness
     
 
 class PlayerAI:
