@@ -55,18 +55,70 @@ class Player:
             #AKA if we still have only the hole cards, then there is only one possible combination of those two
             possibleHands = list(itertools.combinations(allCards, 2))
 
+        bestFoundHand = []
         for h in possibleHands:
             #for each hand that is possibly the best, evaluate it and give it a ranking
+            intHandValue = 0
             intHandStraightedness = getStraightedness(h)
-        
+            listHandPairedness = getPairedness(h)
+            listHandSuitedness = getSuitedness(h)
+            maxSuitedness = max(listHandSuitedness) #This should find the highest suitedness, so we can check if it is 5.
+            if (intHandStraightedness==5):
+                intHandValue+=64 #set the 7th bit to 1
+            if (maxSuitedness==5):
+                intHandValue+=32 #set the 6th bit to 1
+            if (getHighCard(h, 1, 1) == 1): #If the highest card with pairedness >=1 is ace (value 1) then set 5th bit
+                intHandValue+=16
+            suitednessHistogram = [0] * 4
+            for x in listHandSuitedness:
+                if x == 1:
+                    suitednessHistogram[3]+=1
+                elif x == 2:
+                    suitednessHistogram[2] += 1
+                elif x == 3:
+                    suitednessHistogram[1] += 1
+                elif x == 4:
+                    suitednessHistogram[0] += 1
+            if suitednessHistogram[2] == 1:
+                #if there is exactly one pair, set the 4th bit
+                intHandValue += 8
+            if suitednessHistogram[1]==1:
+                #if there is exactly one triplet, set the third bit
+                intHandValue += 4
+            if suitednessHistogram[0]==1:
+                #if exactly one quad, set the second bit
+                intHandValue+=2
+            if suitednessHistogram[3]==1:
+                #if there is exactly one card that is a single, all others are paired, set the first bit
+                intHandValue+=1
+
+            #THE HAND VALUE SHOULD NOW BE SET AND REPRESENTED BY THE SEVEN LEAST SIGNIFICANT BITS IN THIS INTEGER
+
+            #NOW INITIALIZE OWN BEST HAND VALUE ARRAY, USE THIS NUMBER TO DETERMINE THE FIRST INDEX, THEN GROW IT BY THE KICKERS
+            
         
     def getStraightedness(self, incomingHand):
         #incoming hands should already be sorted if possible, but we should verify
         
         #sort the incoming hand
+        #get the pairedness vector
+        #for i = 0 - 10, check i through i+4. Each non empty column adds 1 to the total of that i. Return max
+        straightednessVector = [0] * 10
+        pairednessVector = getPairedness(incomingHand)
+        #create an extended vector to detect straightedness A 2 3 4 5
+        #add another A to the end to detect 5 4 3 2 A
+        pairednessVector.append("A")
+
+        for i in range(0,11): #There are 10 ranges
+            for j in range(0,5): #each range covers at most 5 cards
+                if (pairednessVector[i+j]>0):
+                    straightednessVector[i]+=1 #if the pairedness is one or higher, we have this card, so increment subtotal
+        handMaximumStraightedness = max(straightednessVector)
+        #RETURN HERE
+        return handMaximumStraightedness
         #check the straightedness
         #return Straightedness
-        return 0
+        return -1
 
     def getSuitedness (self, incomingHand):
         #we should return a histogram of suitedness
