@@ -10,6 +10,8 @@ class Player:
         self.inactive = False
         self.allIn = False
         self.currentAI = PlayerAI(self, typeOfAI)
+        self.bestHandCalculated = False
+        self.handRanking.append(1000)
 
     def setAI(self):
         print("Someone should have set the AI")
@@ -33,18 +35,29 @@ class Player:
 
     def modMoney(self, amount):
         self.playerMoney += amount
-        print("Player now has $" + str(self.playerMoney))
+        #print("Player now has $" + str(self.playerMoney))
 
     def returnAction(self):
         #for now it doesn't utilize the gamestate, though we should implement that
         return self.currentAI.returnAction()
-
+        
     
 
     def returnBestHand(self, arrayOfCommunityCards):
-        print("Here we find the best hand that the player has")
+        # Return Best Hand function
+        #   Inputs: The list of community cards
+        #   Returns: None
+        #   Modifies: self.handRanking[]
+        #   
+        #   Function will take in the current community cards and construct the best possible hand based on those community cards.
+        #   It should be agnostic about how many or few cards there are, because it should never be called except after the player
+        #   has been dealt hole cards. Since it will work for any arbitrary amount of cards greater than or equal to 1, it should
+        #   always function.
+
+        #DEBUGTEXT
+        #print("Here we find the best hand that the player has")
         allCards = arrayOfCommunityCards
-        for p in player.holeCards:
+        for p in self.holeCards:
             allCards.append(p)
         
         #returns all possible combinations of 5 cards from the seven available.
@@ -55,19 +68,19 @@ class Player:
             #AKA if we still have only the hole cards, then there is only one possible combination of those two
             possibleHands = list(itertools.combinations(allCards, 2))
 
-        bestFoundHand = []
+        tempHandRanking = [1000] * 6
         for h in possibleHands:
             #for each hand that is possibly the best, evaluate it and give it a ranking
             intHandValue = 0
-            intHandStraightedness = getStraightedness(h)
-            listHandPairedness = getPairedness(h)
-            listHandSuitedness = getSuitedness(h)
+            intHandStraightedness = self.getStraightedness(h)
+            listHandPairedness = self.getPairedness(h)
+            listHandSuitedness = self.getSuitedness(h)
             maxSuitedness = max(listHandSuitedness) #This should find the highest suitedness, so we can check if it is 5.
             if (intHandStraightedness==5):
                 intHandValue+=64 #set the 7th bit to 1
             if (maxSuitedness==5):
                 intHandValue+=32 #set the 6th bit to 1
-            if (getHighCard(h, 1, 1) == 1): #If the highest card with pairedness >=1 is ace (value 1) then set 5th bit
+            if (self.getHighCard(h, 1, 1) == 1): #If the highest card with pairedness >=1 is ace (value 1) then set 5th bit
                 intHandValue+=16
             suitednessHistogram = [0] * 4
             for x in listHandSuitedness:
@@ -93,8 +106,111 @@ class Player:
                 intHandValue+=1
 
             #THE HAND VALUE SHOULD NOW BE SET AND REPRESENTED BY THE SEVEN LEAST SIGNIFICANT BITS IN THIS INTEGER
+            if (intHandValue >=112):
+                #at least the 16, 32, and 64 bits are 1
+                tempHandRanking[0] = 1
+            elif (intHandValue >= 96):
+                #at least the 32 and 64 bits are 1
+                tempHandRanking[0] = 2
+            elif (intHandValue >= 64):
+                #at least the 64 bit is 1
+                tempHandRanking[0] = 6
+            elif (intHandValue >= 32):
+                #at least the 32 bit is 1
+                tempHandRanking[0] = 5
+            elif (intHandValue >= 12):
+                #at least the 4 and 8 bits are 1
+                tempHandRanking[0] = 4
+            elif (intHandValue >= 8):
+                #at least the 8 bit is 1
+                tempHandRanking[0] = 9
+            elif (intHandValue >= 4):
+                #at least the 4 bit is 1
+                tempHandRanking[0] = 7
+            elif (intHandValue >= 2):
+                #at least the 2 bit is 1
+                tempHandRanking[0] = 3
+            elif (intHandValue >= 1):
+                #at least the 1 bit is 1
+                tempHandRanking[0] = 8
+            elif (intHandValue >= 0):
+                #all bits are zero, hand is a high card hand
+                tempHandRanking[0] = 10
+            else:
+                #something has gone wrong, the hand loses
+                tempHandRanking[0] = 100
+
 
             #NOW INITIALIZE OWN BEST HAND VALUE ARRAY, USE THIS NUMBER TO DETERMINE THE FIRST INDEX, THEN GROW IT BY THE KICKERS
+            #However, we do not need to build the kicker's list if the hand is strictly weaker than what we already have.
+            #E.G., if we already have quads, why build kicker list for a high card hand?
+
+            if (tempHandRanking[0] <= self.handRanking[0]): #If the hand we have is better than or equal to our current hand
+                #This block of if statements builds the kicker lists
+                if (tempHandRanking[0] == 1 or tempHandRanking[0] == 100):
+                    #there are no kickers
+                    tempHandRanking[1] == 0
+                elif (tempHandRanking[0] == 2):
+                    #P1
+                    tempHandRanking[1] = self.getHighCard(h, 1, 1) #get the high card from the hand with pairedness 1 and order 1
+                elif (tempHandRanking[0] == 3):
+                    #P4, P1
+                    tempHandRanking[1] = self.getHighCard(h, 4, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 1, 1)
+                elif (tempHandRanking[0] == 4):
+                    #P3, P2
+                    tempHandRanking[1] = self.getHighCard(h, 3, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 2, 1)
+                elif (tempHandRanking[0] == 5):
+                    #P1
+                    tempHandRanking[1] = self.getHighCard(h, 1, 1)
+                elif (tempHandRanking[0] == 6):
+                    #P1
+                    tempHandRanking[1] = self.getHighCard(h, 1, 1)
+                elif (tempHandRanking == 7):
+                    #P3, P1, P1
+                    tempHandRanking[1] = self.getHighCard(h, 3, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 1, 1)
+                    tempHandRanking[3] = self.getHighCard(h, 1, 2)
+                elif (tempHandRanking == 8):
+                    #P2, P2, P1
+                    tempHandRanking[1] = self.getHighCard(h, 2, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 2, 2)
+                    tempHandRanking[3] = self.getHighCard(h, 1, 1)
+                elif (tempHandRanking == 9):
+                    #P2, P1, P1, P1
+                    tempHandRanking[1] = self.getHighCard(h, 2, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 1, 1)
+                    tempHandRanking[3] = self.getHighCard(h, 1, 2)
+                    tempHandRanking[4] = self.getHighCard(h, 1, 3)
+                elif (tempHandRanking == 10):
+                    #P1, P1, P1, P1, P1
+                    tempHandRanking[1] = self.getHighCard(h, 1, 1)
+                    tempHandRanking[2] = self.getHighCard(h, 1, 2)
+                    tempHandRanking[3] = self.getHighCard(h, 1, 3)
+                    tempHandRanking[4] = self.getHighCard(h, 1, 4)
+                    tempHandRanking[5] = self.getHighCard(h, 1, 5)
+
+            if (tempHandRanking[0] < self.handRanking[0]):
+                #if the new hand is strictly better than the old hand, then replace the old hand
+                self.handRanking = tempHandRanking
+            elif (tempHandRanking[0] == self.handRanking[0]):
+                #if the hands are equal in ranking, decide best by examining kickers
+                newHandBetter = False
+                for z in range(0, len(tempHandRanking)):
+                    #should never overflow because if they have equal base values, the lengths of kicker arrays should be equal
+                    if (tempHandRanking[z] < self.handRanking[z]):
+                        newHandBetter = True
+                #if newHandBetter is still false, then hands are either equal or old hand is better, so do not replace.
+                #Otherwise, if newHandBetter is true, then the new hand should replace the old hand.
+                if (newHandBetter == True):
+                    self.handRanking = tempHandRanking
+            elif (tempHandRanking[0] > self.handRanking[0]):
+                #If the old hand is strictly better than the new hand, do nothing, stop evaluating this hand
+                #We should never get to this statement
+                continue
+        self.bestHandCalculated = True
+            
             
         
     def getStraightedness(self, incomingHand):
@@ -104,14 +220,15 @@ class Player:
         #get the pairedness vector
         #for i = 0 - 10, check i through i+4. Each non empty column adds 1 to the total of that i. Return max
         straightednessVector = [0] * 10
-        pairednessVector = getPairedness(incomingHand)
+        pairednessVector = self.getPairedness(incomingHand)
         #create an extended vector to detect straightedness A 2 3 4 5
         #add another A to the end to detect 5 4 3 2 A
-        pairednessVector.append("A")
+        pairednessVector.append(pairednessVector[0]) #add a copy of the aces column to the end
 
-        for i in range(0,11): #There are 10 ranges
+        for i in range(0,10): #There are 10 ranges
             for j in range(0,5): #each range covers at most 5 cards
                 if (pairednessVector[i+j]>0):
+                    
                     straightednessVector[i]+=1 #if the pairedness is one or higher, we have this card, so increment subtotal
         handMaximumStraightedness = max(straightednessVector)
         #RETURN HERE
@@ -121,7 +238,7 @@ class Player:
         return -1
 
     def getSuitedness (self, incomingHand):
-        #we should return a histogram of suitedness
+        #we should return a hisogram of suitedness
         #declare a list/tuple with four slots
         suitednessVector = [0] * 4
         #iterate through each of the 5 cards in the incoming hand
@@ -184,7 +301,7 @@ class Player:
         #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 1 --> 2 (king) 
         #Example: Incoming hand: {K, K, K, Q, 5}, pairedness = 3, order = 2 --> -1 (none)
 
-        pairednessVector = getPairedness(incomingHand)
+        pairednessVector = self.getPairedness(incomingHand)
 
         currentOrder = 0
         for c in range(0, 13):
@@ -217,28 +334,28 @@ class PlayerAI:
         elif (self.name == "Random"):
             #CODE FOR RANDOM ACTIONS
             intAction = random.randint(1,5)
-            if (intAction == 1):
-                print("WE WILL RAISE")
+            if (intAction == 1 and self.parentPlayer.playerMoney > 0):
+                #print("WE WILL RAISE")
                 intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney)
                 return PlayerAction("R", intRaiseAmount)
                 #returnAction = PlayerAction("R", intRaiseAmount)
                 #return returnAction
             
-            elif (intAction == 2):
-                print("WE WILL BET")
+            elif (intAction == 2 and self.parentPlayer.playerMoney > 0):
+                #print("WE WILL BET")
                 intBetAmount = random.randint(1, self.parentPlayer.playerMoney)
                 return PlayerAction("B", intBetAmount)
 
                 #returnAction = PlayerAction("B", intBetAmount)
                 #return returnAction
-            elif (intAction == 3):
-                print("WE WILL CALL")
+            elif (intAction == 3 and self.parentPlayer.playerMoney > 0):
+                #print("WE WILL CALL")
                 intCallAmount = random.randint(1, self.parentPlayer.playerMoney)
                 return PlayerAction("C", intCallAmount)
                 #returnAction = PlayerAction("C", intCallAmount)
                 #return returnAction
             elif (intAction == 4):
-                print ("WE WILL FOLD")
+                #print ("WE WILL FOLD")
                 return PlayerAction("F", 0)
                 #returnAction = PlayerAction("F", 0)
                 #return returnAction
@@ -318,7 +435,7 @@ class Game:
         self.currentRound = incRound
 
     def implementAction(self, incAction, incPlayer, incPlayerIndex):
-        print("We did something")
+        #print("We did something")
         incAct = incAction.actAction
         if (incAct == "R"):
             if (incPlayer.playerMoney >= incAction.actAmt):
@@ -335,6 +452,10 @@ class Game:
                 incPlayer.inactive = True
                 #player no longer has any bet standing in this hand
                 self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+
+            #if the player raises all their money, they shoved and are all in
+                if (incPlayer.playerMoney == incAction.actAmt):
+                    incPlayer.allIn = True
                 
         elif (incAct == "B"):
             if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRound.maximumBet))):
@@ -350,6 +471,10 @@ class Game:
                 #set the new maximum bet if this is a new bet
                 if(self.currentRound.maximumBet == 0):
                     self.currentRound.maximumBet = incAction.actAmt
+
+                #if this bet is all the player's money, then they are all in
+                if (incPlayer.playerMoney == incAction.actAmt):
+                    incPlayer.allIn = True
             else:
                 #player is inactive for the remainder of the round
                 incPlayer.inactive = True
@@ -460,11 +585,11 @@ numRoundsPerGame = 4
 
 #start the games +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 for i in range(0, numGames):
-    #define a list to store the current players
+    #define a list to store the current players (each game has a unique set of players)
     listOfPlayers = []
     #set player loop (1 to 8, if not specified, pick at random)
-    for i in range(0, 8):
-        print("I have set player " + str(i))
+    for u in range(0, 8):
+        print("I have set player " + str(u))
         #create 8 players, ALL RANDOM FOR NOW
         listOfPlayers.append(Player("Random"))
     currentGame = Game(listOfPlayers)
@@ -500,24 +625,53 @@ for i in range(0, numGames):
         if(currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].playerMoney>0):
             currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
             currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
+
+
+        def collectBets():
+            # 1) Loop through players and get actions until allBetsEqual
+            #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+            for q in range(0, numCurPlayers):
+                #print("Get the action from player and update gamestate")
+                #standinForGamestate = []
+                if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+                    #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+                    #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+                    #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+                    newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+                    #print("Implement the action from the player")
+                    currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+                    #implement the action in the game engine // If the action is invalid, the player folds
+                    currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+                    #this updates the gamestate for the next player before it loops
+                else:
+                    #DEBUGTEXT
+                    #print("Player action skipped because player all in or out of game")
+                    continue
+
+
+        collectBets()
+##        # 1) Loop through players and get actions until allBetsEqual
+##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+##        for q in range(0, numCurPlayers):
+##            print("Get the action from player and update gamestate")
+##            #standinForGamestate = []
+##            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+##                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+##                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+##                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+##                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+##                #print("Implement the action from the player")
+##                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+##                #implement the action in the game engine // If the action is invalid, the player folds
+##                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+##                #this updates the gamestate for the next player before it loops
+##            else:
+##                #DEBUGTEXT
+##                print("Player action skipped because player all in or out of game")
+##                continue
+        #now that we have looped through all players, we should then check if all players who are not inactive or all-in
+        #have made the same bet. If they have not, then we should repeat the betting round until such time as they have.
             
-        # 1) Loop through players and get actions until allBetsEqual
-        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
-        for q in range(0, numCurPlayers):
-            print("Get the action from player and update gamestate")
-            standinForGamestate = []
-            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
-                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
-                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
-                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
-                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
-                #print("Implement the action from the player")
-                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
-                #implement the action in the game engine // If the action is invalid, the player folds
-                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
-                #this updates the gamestate for the next player before it loops
-            else:
-                print("Player action skipped because player all in or out of game")
                 
 
             
@@ -525,27 +679,147 @@ for i in range(0, numGames):
         for f in range(0,3):
             currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
         currentGame.currentRound.resetBets()
-        currentGame.currentRound.printCommunityCards()
+        #DEBUGTEXT
+        #currentGame.currentRound.printCommunityCards()
 
-        # Repeat 1
+        collectBets()
+##        # Repeat 1
+##        # 1) Loop through players and get actions until allBetsEqual
+##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+##        for q in range(0, numCurPlayers):
+##            print("Get the action from player and update gamestate")
+##            #standinForGamestate = []
+##            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+##                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+##                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+##                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+##                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+##                #print("Implement the action from the player")
+##                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+##                #implement the action in the game engine // If the action is invalid, the player folds
+##                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+##                #this updates the gamestate for the next player before it loops
+##            else:
+##                #DEBUGTEXT
+##                print("Player action skipped because player all in or out of game")
+##                continue
 
         # Turn revealed
         currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
         currentGame.currentRound.resetBets()
-        currentGame.currentRound.printCommunityCards()
+        #DEBUGTEXT
+        #currentGame.currentRound.printCommunityCards()
 
-        # repeat 1
+        collectBets()
+##        # repeat 1
+##        # 1) Loop through players and get actions until allBetsEqual
+##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+##        for q in range(0, numCurPlayers):
+##            print("Get the action from player and update gamestate")
+##            #standinForGamestate = []
+##            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+##                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+##                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+##                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+##                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+##                #print("Implement the action from the player")
+##                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+##                #implement the action in the game engine // If the action is invalid, the player folds
+##                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+##                #this updates the gamestate for the next player before it loops
+##            else:
+##                #DEBUGTEXT
+##                print("Player action skipped because player all in or out of game")
+##                continue
 
         # river revealed
         currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
         currentGame.currentRound.resetBets()
-        currentGame.currentRound.printCommunityCards()
+        #DEBUGTEXT
+        #currentGame.currentRound.printCommunityCards()
 
-        #repeat 1
+        #collect new betting round.
+        collectBets()
+
+##        #repeat 1
+##                # 1) Loop through players and get actions until allBetsEqual
+##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+##        for q in range(0, numCurPlayers):
+##            print("Get the action from player and update gamestate")
+##            #standinForGamestate = []
+##            if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+##                #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
+##                #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
+##                #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
+##                newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction() 
+##                #print("Implement the action from the player")
+##                currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
+##                #implement the action in the game engine // If the action is invalid, the player folds
+##                currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+##                #this updates the gamestate for the next player before it loops
+##            else:
+##                #DEBUGTEXT
+##                print("Player action skipped because player all in or out of game")
+##                continue
             
         #resolve round + award money
         #This should be the code that evaluates the strength of each player's hand, awards money to winner
         #Assign all players a reward equal to the amount of money they won - the amount of money they bet
+        currentHighestRank = -1
+        currentWinner = []
+        currentWinner.append(-1)
+        for w in range(0, len(currentGame.listOfPlayers)):
+            if (currentGame.listOfPlayers[w].inactive == False):
+                #if the player is in the hand and hasn't folded
+
+                if (currentGame.listOfPlayers[w].bestHandCalculated == False):
+                    #if the hand has never been calculated, calculate it, passing in the current community cards
+                    currentGame.listOfPlayers[w].returnBestHand(currentGame.currentRound.communityCards)
+                    
+                if (currentWinner[0] == -1):
+                    #if this is the first hand looked at, it's by default the highest so far
+                    currentWinner[0] = w
+                #else compare the hands
+                elif (currentGame.listOfPlayers[w].handRanking[0] < currentGame.listOfPlayers[currentWinner[0]].handRanking[0]):
+                    #if the current player's hand is strictly better than the old best hand, replace the old best hand
+                    currentWinner[0] = w
+                elif (currentGame.listOfPlayers[w].handRanking[0] == currentGame.listOfPlayers[currentWinner[0]].handRanking[0]):
+                    #if the base hand scores of each player are exactly the same then iterate through kicker arrays to find winner
+                    tieDetected = True
+                    for k in range(0, len(currentGame.listOfPlayers[w].handRanking)):
+                        #lengths should be the same since main value is the same
+                        if (currentGame.listOfPlayers[currentWinner[0]].handRanking[k] < currentGame.listOfPlayers[w].handRanking[k]):
+                            #if the current winner beats the new hand on any tiebreaker, then we continue, because the old hand wins
+                            #print("old hand wins")
+                            tieDetected = False
+                            pass
+                        elif (currentGame.listOfPlayers[currentWinner[0]].handRanking[k] > currentGame.listOfPlayers[w].handRanking[k]):
+                            #if the new hand wins, then we replace the old hand
+                            currentWinner[0] = w
+                            tieDetected = False
+                            #continue
+                        
+                            
+                    #if we made it through the loop and didn't break the tie, then they are tied, so they split the pot.
+                    if (tieDetected == True):
+                        currentWinner.append(w)
+                    
+                            
+                        
+                    #Else if the main rankings are a tie, iterate through the kicker arrays to find winner.
+                    
+                    
+
+
+                #Add the pot to the money of whichever player has the highest.
+                numWinners = len(currentWinner)
+                perPlayerPot = currentGame.currentRound.currentPot // numWinners
+                for y in currentWinner:
+                    #give the split pot to all players splitting it
+                    currentGame.listOfPlayers[y].playerMoney += perPlayerPot
+
+                print("Round resolved!")
+                
 
 
         #set all players to not inactive and not all in
@@ -554,12 +828,24 @@ for i in range(0, numGames):
             p.inactive = False
             p.allIn = False
             if (p.playerMoney <= 0):
+                #remove them for the remainder of rounds, (they will be added back into the next game)
                 currentGame.listOfPlayers.remove(p)
+        print("Current Game's list of players length: " + str(len(currentGame.listOfPlayers)))
         
         #If only one player left in the list of players, break out of the loop and end the game
         if (len(currentGame.listOfPlayers) == 1):
+            print("Game over with one player having all the money!")
+            #we have arrived at a winner, they have all the chips! No need to play more rounds, break out of the loop!
             break
-        
+        print("J is: " + str(j))
+        if (j == (numRoundsPerGame-1)):
+            #print the list of players and their money.
+            outputString = ""
+            for player in currentGame.listOfPlayers:
+                outputString = (outputString +"Player X finishes the rounds with: $")
+                outputString = (outputString + str(player.playerMoney))
+
+            print(outputString)
         #last part of resolving is to increment the dealer
         currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
 
