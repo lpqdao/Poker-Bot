@@ -1,5 +1,6 @@
 import random
 import itertools
+import time
 
 class Player:
 
@@ -336,21 +337,21 @@ class PlayerAI:
             intAction = random.randint(1,5)
             if (intAction == 1 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL RAISE")
-                intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney)
+                intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney+1)
                 return PlayerAction("R", intRaiseAmount)
                 #returnAction = PlayerAction("R", intRaiseAmount)
                 #return returnAction
             
             elif (intAction == 2 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL BET")
-                intBetAmount = random.randint(1, self.parentPlayer.playerMoney)
+                intBetAmount = random.randint(1, self.parentPlayer.playerMoney+1)
                 return PlayerAction("B", intBetAmount)
 
                 #returnAction = PlayerAction("B", intBetAmount)
                 #return returnAction
             elif (intAction == 3 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL CALL")
-                intCallAmount = random.randint(1, self.parentPlayer.playerMoney)
+                intCallAmount = random.randint(1, self.parentPlayer.playerMoney+1)
                 return PlayerAction("C", intCallAmount)
                 #returnAction = PlayerAction("C", intCallAmount)
                 #return returnAction
@@ -424,7 +425,7 @@ class Deck:
 class Game:
     def __init__(self, incListOfPlayers):
         self.listOfPlayers = []
-        self.smallBlind = 5
+        self.smallBlind = 10
         self.bigBlind = 2 * self.smallBlind
         self.currentDealer = 0
         self.listOfPlayers = incListOfPlayers
@@ -432,6 +433,8 @@ class Game:
         self.currentRound = Round()
 
     def setNewRound(self, incRound):
+        del(self.currentRound)
+        self.currentRound = None
         self.currentRound = incRound
 
     def implementAction(self, incAction, incPlayer, incPlayerIndex):
@@ -441,25 +444,36 @@ class Game:
             if (incPlayer.playerMoney >= incAction.actAmt):
                 #if player raised (like from 200 to 500) deduct what they currently have in pot and add total amount (they added +300)
                 self.currentRound.currentPot += incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]
+                #DEBUGTEXT
+                #print("The pot is increased by: ($" + str(incAction.actAmt) + " - $" + str(self.currentRound.tempPlayerBets[incPlayerIndex]) + ") for a total of: $" + str(incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]))
                 #player's money is incremented by previous bet amount minus new raised amount (should be negative)
                 self.listOfPlayers[incPlayerIndex].playerMoney += (self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt)
+                #DEBUGTEXT
+                #print("Player's money is increased by: $" + str(self.currentRound.tempPlayerBets[incPlayerIndex]) + " - $" + str(incAction.actAmt) + " for a total of: " + str(self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt))
                 #replace what they bet with their new maximum bet
                 self.currentRound.tempPlayerBets[incPlayerIndex] = incAction.actAmt
                 self.currentRound.maximumBet = incAction.actAmt
+                #DEBUGTEXT
+                #print("Player raises by: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
             else:
                 #the player didn't have enough money for their action, action invalid, they fold.
                 #player is inactive for the remainder of the round
+                #DEBUGTEXT
+                #print("Player tried to raise with insufficient funds and is folded.")
                 incPlayer.inactive = True
                 #player no longer has any bet standing in this hand
-                self.CurrentRound.tempPlayerBets[incPlayerIndex] = 0;
+                self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
 
             #if the player raises all their money, they shoved and are all in
-                if (incPlayer.playerMoney == incAction.actAmt):
-                    incPlayer.allIn = True
+            if (incPlayer.playerMoney == incAction.actAmt):
+                incPlayer.allIn = True
                 
         elif (incAct == "B"):
             if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRound.maximumBet))):
                 #if player has enough money, and the amount is >= the max bet or is the first bet, then implement it
+
+                #DEBUGTEXT
+                #print("Player bets by: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
 
                 #increase the pot
                 self.currentRound.currentPot += incAction.actAmt
@@ -478,11 +492,15 @@ class Game:
             else:
                 #player is inactive for the remainder of the round
                 incPlayer.inactive = True
+                #DEBUGTEXT
+                #print("Player tried to bet too much, they are folded")
                 #player no longer has any bet standing in this hand
                 self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "C"):
             #if the player has enough money and the amount they entered is exactly equal to the maximum bet
             if ((incPlayer.playerMoney >= incAction.actAmt) and (incAction.actAmt >= self.currentRound.maximumBet)):
+                #DEBUGTEXT
+                #print("Player CALLS with: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
                 self.currentRound.currentPot += self.currentRound.maximumBet
 
                 #increase the player bet ammount and deduct their bet from their money
@@ -493,6 +511,8 @@ class Game:
             elif (incPlayer.playerMoney < self.currentRound.maximumBet):
                 #the player doesn't have enough to cover the max bet but is calling
                 ## PERFECT SIDEPOTS LATER
+                #DEBUGTEXT
+                #print("PLAYER IS CALLING WITH LESS THAN THE MAXIMUM BET")
                 self.currentRound.currentPot += incPlayer.playerMoney
                 self.currentRound.tempPlayerBets[incPlayerIndex] += incPlayer.playerMoney
                 incPlayer.playerMoney = 0
@@ -504,12 +524,16 @@ class Game:
                 self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "F"):
             #player is inactive for the remainder of the round
+            #DEBUGTEXT
+            #print("Player folds!")
             incPlayer.inactive = True
             #player no longer has any bet standing in this hand
             self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         else:
             #unknown or invalid action, player folds.
             #player is inactive for the remainder of the round
+            #DEBUGTEXT
+            #print("PLAYER FOLDS FOR UNKNOWN REASONS!")
             incPlayer.inactive = True
             #player no longer has any bet standing in this hand
             self.currentRound.tempPlayerBets[incPlayerIndex] = 0;            
@@ -575,30 +599,36 @@ class PlayerAction:
 #Initialize the new tournament
 
 #how many games
-numGames = 10
+numGames = 1000
 
 #how many rounds per game
-numRoundsPerGame = 4
+numRoundsPerGame = 30
 
+simulationOutputString = ""
 
-
+#DEBUG
+start = time.time()
 
 #start the games +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 for i in range(0, numGames):
     #define a list to store the current players (each game has a unique set of players)
     listOfPlayers = []
+    listOfPlayers[:] = []
     #set player loop (1 to 8, if not specified, pick at random)
     for u in range(0, 8):
-        print("I have set player " + str(u))
+        #print("I have set player " + str(u))
         #create 8 players, ALL RANDOM FOR NOW
         listOfPlayers.append(Player("Random"))
     currentGame = Game(listOfPlayers)
     
     #start the rounds ----------------------------------------------------------------------------------------
-    print("BEGIN GAME NUMBER: " + str(i))
+    #print("\n\nBEGIN GAME NUMBER: " + str(i+1))
+    simulationOutputString += ("\n\nBEGIN GAME NUMBER: " + str(i+1))
     for j in range(0, numRoundsPerGame):
         currentRound = Round()
-        currentGame.setNewRound(currentRound)
+        
+        #currentGame.setNewRound(currentRound)
+        currentGame.setNewRound(Round())
         
         #start the game
 
@@ -610,6 +640,16 @@ for i in range(0, numGames):
         #create new deck
         #d = Deck() # new deck created
         #deal the cards // randomly select cards from the deck and give them to a player.
+        #set the blinds
+        numCurPlayers = len(currentGame.listOfPlayers)
+        currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
+        currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%numCurPlayers]+=currentGame.smallBlind
+        currentGame.currentRound.currentPot +=(currentGame.smallBlind)
+        #simulationOutputString += ("\nAdding a small blind of: $" + str(currentGame.smallBlind) + " and a big blind of: $" + str(currentGame.bigBlind))
+        currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
+        currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
+        currentGame.currentRound.currentPot +=(currentGame.bigBlind)
+            
         for p in currentGame.listOfPlayers:
             if (p.inactive == False):
                 p.drawCards(currentGame.currentRound.deck)
@@ -617,14 +657,19 @@ for i in range(0, numGames):
         #d.printRemainingDeck() #Prints the remaining cards
         
         #deduct blinds
-        numCurPlayers = len(currentGame.listOfPlayers)
-        if(currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].playerMoney>0):
-            currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
-            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%numCurPlayers]+=currentGame.smallBlind
+##        numCurPlayers = len(currentGame.listOfPlayers)
+##        if(currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].playerMoney>0):
+##            currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
+##            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%numCurPlayers]+=currentGame.smallBlind
+##            currentGame.currentRound.currentPot +=(currentGame.smallBlind)
+##            
+##        if(currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].playerMoney>0):
+##            currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
+##            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
+##            currentGame.currentRound.currentPot +=(currentGame.bigBlind)
+
             
-        if(currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].playerMoney>0):
-            currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
-            currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
+
 
 
         def collectBets():
@@ -771,6 +816,7 @@ for i in range(0, numGames):
         for w in range(0, len(currentGame.listOfPlayers)):
             if (currentGame.listOfPlayers[w].inactive == False):
                 #if the player is in the hand and hasn't folded
+                currentHighestRank = 0
 
                 if (currentGame.listOfPlayers[w].bestHandCalculated == False):
                     #if the hand has never been calculated, calculate it, passing in the current community cards
@@ -808,7 +854,9 @@ for i in range(0, numGames):
                         
                     #Else if the main rankings are a tie, iterate through the kicker arrays to find winner.
                     
-                    
+                if (currentHighestRank == -1):
+                    #no player was ever active, so give the money to a random person
+                    currentWinner[0] = 0
 
 
                 #Add the pot to the money of whichever player has the highest.
@@ -817,8 +865,15 @@ for i in range(0, numGames):
                 for y in currentWinner:
                     #give the split pot to all players splitting it
                     currentGame.listOfPlayers[y].playerMoney += perPlayerPot
+                    currentGame.listOfPlayers[y].allIn = False
 
-                print("Round resolved!")
+                #print("Awarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
+                simulationOutputString += ("\n The total pot value is: $" + str(currentGame.currentRound.currentPot))
+                simulationOutputString += ("\nAwarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
+                #print("Round resolved!")
+                
+                
+                
                 
 
 
@@ -829,27 +884,47 @@ for i in range(0, numGames):
             p.allIn = False
             if (p.playerMoney <= 0):
                 #remove them for the remainder of rounds, (they will be added back into the next game)
+                simulationOutputString += ("\nRemoving a player who has: $" + str(p.playerMoney))
                 currentGame.listOfPlayers.remove(p)
-        print("Current Game's list of players length: " + str(len(currentGame.listOfPlayers)))
+        #print("Current Game's list of players length: " + str(len(currentGame.listOfPlayers)))
         
         #If only one player left in the list of players, break out of the loop and end the game
         if (len(currentGame.listOfPlayers) == 1):
-            print("Game over with one player having all the money!")
+            #print("Game over with one player having all the money!")
+            simulationOutputString += ("\n\nGame over with one player having all the money!")
+            simulationOutputString += ("\nThe player has: $" + str(currentGame.listOfPlayers[0].playerMoney))
             #we have arrived at a winner, they have all the chips! No need to play more rounds, break out of the loop!
             break
-        print("J is: " + str(j))
+        #print("J is: " + str(j))
         if (j == (numRoundsPerGame-1)):
             #print the list of players and their money.
             outputString = ""
+            outputSum = 0
             for player in currentGame.listOfPlayers:
-                outputString = (outputString +"Player X finishes the rounds with: $")
+                outputString = (outputString +"\nPlayer X finishes the rounds with: $")
                 outputString = (outputString + str(player.playerMoney))
+                outputSum += player.playerMoney
+            simulationOutputString += ("\nTotal Game Money: $" + str(outputSum))
+            #print("Total Game Money: $" + str(outputSum))
 
-            print(outputString)
+            simulationOutputString += outputString
+            #print(outputString)
         #last part of resolving is to increment the dealer
         currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
+        currentGame.currentRound.currentPot = 0
+        currentWinner[:] = [] #delete the winner list
 
     
     #HERE IS THE END OF THIS GAME
+    
     #There should be some code here to collect the final state of the game, such as the amount of money held by each player (could be 80,000 by 1, 0 by the rest, etc)
-    #INSERT SOME CODE TO DELETE THE CURRENT GAME
+    #INSERT SOME CODE TO DELETE THE CURRENT GAM
+
+
+#print accumulated output
+#print (simulationOutputString)
+
+#DEBUG -- Below lines are for debug purposes
+print("DONE!")
+end = time.time()
+print(end - start)
