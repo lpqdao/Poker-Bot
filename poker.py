@@ -337,44 +337,86 @@ class PlayerAI:
             intAction = random.randint(1,5)
             if (intAction == 1 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL RAISE")
-                intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney+1)
-                return PlayerAction("R", intRaiseAmount)
+                #intRaiseAmount = random.randint(1, self.parentPlayer.playerMoney+1)
+                #What type of raise will it be?
+                strSubRaiseType = ""
+                intRaiseType = random.randint(0, 5)
+
+                if (intRaiseType == 0):
+                    strSubRaiseType = "R0"
+                elif (intRaiseType == 1):
+                    strSubRaiseType = "R1"
+                elif(intRaiseType == 2):
+                    strSubRaiseType = "R2"
+                elif (intRaiseType == 3):
+                    strSubRaiseType = "R3"
+                elif (intRaiseType == 4):
+                    strSubRaiseType = "R4"
+                elif (intRaiseType == 5):
+                    strSubRaiseType = "R5"
+                else:
+                    strSubRaiseType = "R0"
+
+                return PlayerAction("R", 0, strSubRaiseType)
                 #returnAction = PlayerAction("R", intRaiseAmount)
                 #return returnAction
             
             elif (intAction == 2 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL BET")
-                intBetAmount = random.randint(1, self.parentPlayer.playerMoney+1)
-                return PlayerAction("B", intBetAmount)
+                #intBetAmount = random.randint(1, self.parentPlayer.playerMoney+1)
+
+                strSubBetType = ""
+                intBetType = random.randint(0, 7)
+
+                if (intBetType == 0):
+                    strSubRaiseType = "B00"
+                elif (intBetType == 1):
+                    strSubRaiseType = "B05"
+                elif(intBetType == 2):
+                    strSubRaiseType = "B10"
+                elif (intBetType == 3):
+                    strSubRaiseType = "B20"
+                elif (intBetType == 4):
+                    strSubRaiseType = "B50"
+                elif (intBetType == 5):
+                    strSubRaiseType = "BHP"
+                elif (intBetType == 6):
+                    strSubRaiseType = "BFP"
+                else:
+                    strSubRaiseType = "B0"
+
+
+                return PlayerAction("B", 0, strSubBetType)
 
                 #returnAction = PlayerAction("B", intBetAmount)
                 #return returnAction
             elif (intAction == 3 and self.parentPlayer.playerMoney > 0):
                 #print("WE WILL CALL")
                 intCallAmount = random.randint(1, self.parentPlayer.playerMoney+1)
-                return PlayerAction("C", intCallAmount)
+                #return PlayerAction("C", intCallAmount)
+                return PlayerAction("B", 0, "B00") # This returns a min bet, also known as a call, but it will fold if the bet cannot be made
                 #returnAction = PlayerAction("C", intCallAmount)
                 #return returnAction
             elif (intAction == 4):
                 #print ("WE WILL FOLD")
-                return PlayerAction("F", 0)
+                return PlayerAction("F", 0, "F")
                 #returnAction = PlayerAction("F", 0)
                 #return returnAction
             else:
-                return PlayerAction("F", 0)
+                return PlayerAction("F", 0, "F")
         elif (self.name == "Player"):
             #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             #for now we just fold, because we have nothing
             #returnAction = PlayerAction("F", 0)
             #return returnAction
-            returnAction = PlayerAction("F", 0)
+            returnAction = PlayerAction("F", 0, "F")
 
             #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         else:
             #DO RANDOM ACTIONS
             #returnAction = PlayerAction("F", 0)
             #return returnAction
-            return PlayerAction("F", 0)
+            return PlayerAction("F", 0, "F")
         
     
 class Card:
@@ -440,93 +482,169 @@ class Game:
     def implementAction(self, incAction, incPlayer, incPlayerIndex):
         #print("We did something")
         incAct = incAction.actAction
+        newSubAct = incAction.actSub
         if (incAct == "R"):
-            if (incPlayer.playerMoney >= incAction.actAmt):
+            #player will raise, check how much
+            intPlayerRaiseAmount = 0
+            if (newSubAct == "R0"):
+                #We have a min raise, so raise by 2x currentMaxBet, bet cannot be 0.
+                intPlayerRaiseAmount = max(((self.currentRound.maximumBet)*2), (self.bigBlind * 2))
+            elif (newSubAct == "R1"):
+                #The new raise is 2x min raise
+                intPlayerRaiseAmount = max(((self.currentRound.maximumBet)*4), (self.bigBlind * 2))
+            elif (newSubAct == "R2"):
+                #The new raise is 4x min raise
+                intPlayerRaiseAmount = max(((self.currentRound.maximumBet)*8), (self.bigBlind * 2))
+            elif (newSubAct == "R3"):
+                #the new raise is 8x min raise
+                intPlayerRaiseAmount = max(((self.currentRound.maximumBet)*16), (self.bigBlind * 2))
+            elif (newSubAct == "R4"):
+                #The new raise is all in! Player shoves!
+                intPlayerRaiseAmount = self.listOfPlayers[incPlayerIndex].playerMoney
+            else:
+                    # We have a nonspecific raise, which are always min raises
+                    intPlayerRaiseAmount = max(((self.currentRound.maximumBet)*2), (self.bigBlind * 2))
+
+            if (self.listOfPlayers[incPlayerIndex].playerMoney >= intPlayerRaiseAmount): #Check to see if the player has enough money
+                #print("Player " + str(incPlayerIndex+1) + "\\" + str(len(listOfPlayers)) + " has $" + str(incPlayer.playerMoney) + " and is wagering $" + str(intPlayerRaiseAmount))
                 #if player raised (like from 200 to 500) deduct what they currently have in pot and add total amount (they added +300)
-                self.currentRound.currentPot += incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]
+                #self.currentRound.currentPot += incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]
+
+                #DEBUG
+                #if (intPlayerRaiseAmount > 80000):
+                    #print("WARNING! LINE 514! PLAYER RAISING OVER 80k! IN GAME: " + str(i) + " AND ROUND: " + str(j))
+                self.currentRound.currentPot += intPlayerRaiseAmount #If I have enough money, put it in the pot
                 #DEBUGTEXT
-                #print("The pot is increased by: ($" + str(incAction.actAmt) + " - $" + str(self.currentRound.tempPlayerBets[incPlayerIndex]) + ") for a total of: $" + str(incAction.actAmt - self.currentRound.tempPlayerBets[incPlayerIndex]))
+                #print("The pot is increased by: $" + str(intPlayerRaiseAmount))
                 #player's money is incremented by previous bet amount minus new raised amount (should be negative)
-                self.listOfPlayers[incPlayerIndex].playerMoney += (self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt)
+
+                #Change the player's money
+                #self.listOfPlayers[incPlayerIndex].playerMoney += (self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt)
+                #DEBUG
+                #if (intPlayerRaiseAmount < 0):
+                    #print("WARNING! LINE 524! PLAYER RAISING NEGATIVE AMOUNT!")
+                self.listOfPlayers[incPlayerIndex].playerMoney -= intPlayerRaiseAmount
                 #DEBUGTEXT
                 #print("Player's money is increased by: $" + str(self.currentRound.tempPlayerBets[incPlayerIndex]) + " - $" + str(incAction.actAmt) + " for a total of: " + str(self.currentRound.tempPlayerBets[incPlayerIndex] - incAction.actAmt))
                 #replace what they bet with their new maximum bet
-                self.currentRound.tempPlayerBets[incPlayerIndex] = incAction.actAmt
-                self.currentRound.maximumBet = incAction.actAmt
-                #DEBUGTEXT
-                #print("Player raises by: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
+                self.currentRound.tempPlayerBets[incPlayerIndex] = intPlayerRaiseAmount
+                self.currentRound.maximumBet = intPlayerRaiseAmount
+
             else:
                 #the player didn't have enough money for their action, action invalid, they fold.
                 #player is inactive for the remainder of the round
                 #DEBUGTEXT
                 #print("Player tried to raise with insufficient funds and is folded.")
-                incPlayer.inactive = True
+                #print("ILLEGAL RAISE, PLAYER FOLDED")
+
+                self.listOfPlayers[incPlayerIndex].inactive = True
                 #player no longer has any bet standing in this hand
                 self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
 
             #if the player raises all their money, they shoved and are all in
-            if (incPlayer.playerMoney == incAction.actAmt):
-                incPlayer.allIn = True
+            if (self.listOfPlayers[incPlayerIndex].playerMoney == 0):
+                self.listOfPlayers[incPlayerIndex].allIn = True
                 
         elif (incAct == "B"):
-            if ((incPlayer.playerMoney >= incAction.actAmt) and ((self.currentRound.maximumBet == 0) or (incAction.actAmt == currentRound.maximumBet))):
-                #if player has enough money, and the amount is >= the max bet or is the first bet, then implement it
+            intPlayerBetAmount = 0
+            if (newSubAct == "B00"):
+                # We have a min bet, so bet the current bet, even if it is 0.
+                intPlayerBetAmount = (self.currentRound.maximumBet) * 1
+            elif (newSubAct == "B05"):
+                # The new bet is 5% of the player's money to lowest integer
+                intPlayerBetAmount = (self.listOfPlayers[incPlayerIndex].playerMoney) // 0.05
+            elif (newSubAct == "B10"):
+                # The new bet is 10% of the player's money to lowest integer
+                intPlayerBetAmount = (self.listOfPlayers[incPlayerIndex].playerMoney) // 0.10
+            elif (newSubAct == "B20"):
+                # The new bet is 20% of the player's money to lowest integer
+                intPlayerBetAmount = (self.listOfPlayers[incPlayerIndex].playerMoney) // 0.20
+            elif (newSubAct == "B50"):
+                # The new bet is 50% of the player's money to lowest integer
+                intPlayerBetAmount = (self.listOfPlayers[incPlayerIndex].playerMoney) // 0.50
+            elif (newSubAct == "BHP"):
+                # The new bet is 50% of the current pot
+                intPlayerBetAmount = (self.currentRound.currentPot) // 2
+            elif (newSubAct == "BFP"):
+                # The new bet is 100% of the current pot
+                intPlayerBetAmount = (self.currentRound.currentPot)
+            else:
+                #min bet
+                intPlayerBetAmount = (self.currentRound.maximumBet) * 1
+
+            #check if the player has enough money
+            if ((self.listOfPlayers[incPlayerIndex].playerMoney >= intPlayerBetAmount) and ((self.currentRound.maximumBet == 0) or (intPlayerBetAmount == currentRound.maximumBet))):
+                #if player has enough money, and the amount is = the max bet or is the first bet, then implement it
 
                 #DEBUGTEXT
-                #print("Player bets by: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
+                #print("Player " + str(incPlayerIndex+1) + "\\" + str(len(listOfPlayers)) + " bets by: $" + str(intPlayerBetAmount) + "/ $" + str(self.listOfPlayers[incPlayerIndex].playerMoney))
 
                 #increase the pot
-                self.currentRound.currentPot += incAction.actAmt
+                self.currentRound.currentPot += intPlayerBetAmount
+                #DEBUG
+                #if (intPlayerBetAmount > 80000):
+                    #print("WARNING! LINE 584! PLAYER BETTING OVER 80k!")
 
                 #increase player bet amount + deduct their bet from their money
                 self.listOfPlayers[incPlayerIndex].playerMoney -= incAction.actAmt
-                self.currentRound.tempPlayerBets[incPlayerIndex] += incAction.actAmt
+                #incPlayer.playerMoney -= intPlayerBetAmount
+                #debug
+                #if (intPlayerBetAmount < 0):
+                    #print("WARNING! LINE 591! PLAYER BETTING A NEGATIVE AMOUNT")
+
+                self.currentRound.tempPlayerBets[incPlayerIndex] += intPlayerBetAmount
                 
                 #set the new maximum bet if this is a new bet
                 if(self.currentRound.maximumBet == 0):
-                    self.currentRound.maximumBet = incAction.actAmt
+                    self.currentRound.maximumBet = intPlayerBetAmount
 
                 #if this bet is all the player's money, then they are all in
-                if (incPlayer.playerMoney == incAction.actAmt):
-                    incPlayer.allIn = True
+                #if (incPlayer.playerMoney == 0):
+                if (self.listOfPlayers[incPlayerIndex].playerMoney == 0):
+                    self.listOfPlayers[incPlayerIndex].allIn = True
             else:
-                #player is inactive for the remainder of the round
-                incPlayer.inactive = True
+                #player is inactive for the remainder of the round because they made an illegal move
+                self.listOfPlayers[incPlayerIndex].inactive = True
                 #DEBUGTEXT
                 #print("Player tried to bet too much, they are folded")
                 #player no longer has any bet standing in this hand
                 self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "C"):
             #if the player has enough money and the amount they entered is exactly equal to the maximum bet
-            if ((incPlayer.playerMoney >= incAction.actAmt) and (incAction.actAmt >= self.currentRound.maximumBet)):
+            if ((self.listOfPlayers[incPlayerIndex].playerMoney >= incAction.actAmt) and (incAction.actAmt >= self.currentRound.maximumBet)):
                 #DEBUGTEXT
-                #print("Player CALLS with: $" + str(incAction.actAmt) + "/ $" + str(incPlayer.playerMoney))
+                #print("Player CALLS with: $" + str(incAction.actAmt) + "/ $" + str(self.listOfPlayers[incPlayerIndex].playerMoney))
                 self.currentRound.currentPot += self.currentRound.maximumBet
-
+                #DEBUG
+                #print("WARNING! LINE 616! PLAYER USINGT CALL FUNCTIONALITY!")
                 #increase the player bet ammount and deduct their bet from their money
                 self.listOfPlayers[incPlayerIndex].playerMoney -= self.currentRound.maximumBet
                 self.currentRound.tempPlayerBets[incPlayerIndex] += self.currentRound.maximumBet
 
                 #max bet doesn't change in a call, so skip that
-            elif (incPlayer.playerMoney < self.currentRound.maximumBet):
+            elif (self.listOfPlayers[incPlayerIndex].playerMoney < self.currentRound.maximumBet):
                 #the player doesn't have enough to cover the max bet but is calling
                 ## PERFECT SIDEPOTS LATER
                 #DEBUGTEXT
                 #print("PLAYER IS CALLING WITH LESS THAN THE MAXIMUM BET")
-                self.currentRound.currentPot += incPlayer.playerMoney
-                self.currentRound.tempPlayerBets[incPlayerIndex] += incPlayer.playerMoney
-                incPlayer.playerMoney = 0
-                incPlayer.allIn = True
+                #print("WARNING! LINE 627! PLAYER USING DEPRICATED CALL FUNCTIONALITY!")
+                self.currentRound.currentPot += self.listOfPlayers[incPlayerIndex].playerMoney
+                self.currentRound.tempPlayerBets[incPlayerIndex] += self.listOfPlayers[incPlayerIndex].playerMoney
+                self.listOfPlayers[incPlayerIndex].playerMoney = 0
+                self.listOfPlayers[incPlayerIndex].allIn = True
             else:
                 #player is inactive for the remainder of the round
-                incPlayer.inactive = True
+                print("ILLEGAL CALL, PLAYER FOLDED")
+                self.listOfPlayers[incPlayerIndex].inactive = True
                 #player no longer has any bet standing in this hand
                 self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         elif (incAct == "F"):
             #player is inactive for the remainder of the round
             #DEBUGTEXT
             #print("Player folds!")
-            incPlayer.inactive = True
+            #incPlayer.inactive = True
+            self.listOfPlayers[incPlayerIndex].inactive = True
+            #print("Player " + str(incPlayerIndex+1) + "\\" + str(len(listOfPlayers)) + " folds with a stack of $" + str(incPlayer.playerMoney))
             #player no longer has any bet standing in this hand
             self.currentRound.tempPlayerBets[incPlayerIndex] = 0;
         else:
@@ -534,7 +652,8 @@ class Game:
             #player is inactive for the remainder of the round
             #DEBUGTEXT
             #print("PLAYER FOLDS FOR UNKNOWN REASONS!")
-            incPlayer.inactive = True
+            #incPlayer.inactive = True
+            self.listOfPlayers[incPlayerIndex].inactive = True
             #player no longer has any bet standing in this hand
             self.currentRound.tempPlayerBets[incPlayerIndex] = 0;            
                 
@@ -581,25 +700,29 @@ class Round:
 
 class PlayerAction:
     actions = ["R", "B", "C", "F"]
+    subRaises = ["R0","R1","R2","R3","R4","R5"]
+    subBets = ["B00","B05", "B10", "B20", "B50", "BFP", "BHP"]
+
+    #Raises: Min-raise, 2x Min, 4x Min, 8x Min, All in
+    #Bets: Min Bet(call, or check if 0), 5% (of Stack), 10%, 20%, 50%, Pot Side Bet, Half Pot
     # R = Raise, should have a corresponding amount
     # B = Bet, should have a corresponding amount, a check is a bet of 0
     # C = Call, corresponding amount = unknown. Player can call with max(currentMaxBet, playerMoney) but if they don't have enough money, they only get the sidepot
     # F = Fold, corresponding amount = 0
 
-    def __init__(self, incAction, incAmt):
+    def __init__(self, incAction, incAmt, incSubAction):
         if (incAction in self.actions):
             self.actAction = incAction
             self.actAmt = incAmt
+            self.actSub = incSubAction
         else:
             self.actAction = "F"
             self.actAmt = 0
-    
-        
-
+            self.actSub = "F"
 #Initialize the new tournament
 
 #how many games
-numGames = 1000
+numGames = 10
 
 #how many rounds per game
 numRoundsPerGame = 30
@@ -642,11 +765,12 @@ for i in range(0, numGames):
         #deal the cards // randomly select cards from the deck and give them to a player.
         #set the blinds
         numCurPlayers = len(currentGame.listOfPlayers)
-        currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
+        #currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].modMoney(-currentGame.smallBlind)
+        currentGame.listOfPlayers[(currentGame.currentDealer+1)%numCurPlayers].playerMoney -= currentGame.smallBlind
         currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+1)%numCurPlayers]+=currentGame.smallBlind
         currentGame.currentRound.currentPot +=(currentGame.smallBlind)
         #simulationOutputString += ("\nAdding a small blind of: $" + str(currentGame.smallBlind) + " and a big blind of: $" + str(currentGame.bigBlind))
-        currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].modMoney(-currentGame.bigBlind)
+        currentGame.listOfPlayers[(currentGame.currentDealer+2)%numCurPlayers].playerMoney -= currentGame.bigBlind
         currentGame.currentRound.tempPlayerBets[(currentGame.currentDealer+2)%numCurPlayers]+=currentGame.bigBlind
         currentGame.currentRound.currentPot +=(currentGame.bigBlind)
             
@@ -675,10 +799,19 @@ for i in range(0, numGames):
         def collectBets():
             # 1) Loop through players and get actions until allBetsEqual
             #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
+            numActivePlayers = 0
+            for z in range(0, numCurPlayers):
+                if (currentGame.listOfPlayers[z].inactive == False and currentGame.listOfPlayers[z].allIn == False):
+                    numActivePlayers += 1
             for q in range(0, numCurPlayers):
                 #print("Get the action from player and update gamestate")
                 #standinForGamestate = []
-                if ((currentGame.listOfPlayers[q].inactive == False) and (currentGame.listOfPlayers[q].allIn == False)):
+                if ((currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].inactive == False) and (currentGame.listOfPlayers[q].allIn == False) and (numActivePlayers > 1)):
+                    #if (numActivePlayers == 1):
+                    #    #if there is only one player, break out of the loop
+                    #    break
+                    #DEBUGTEXT
+                    #print("Player " + str((q + 1+currentGame.currentDealer+3)%numCurPlayers) + "\\" + str(numCurPlayers) + "'s action is implemented!")
                     #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
                     #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
                     #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
@@ -690,11 +823,16 @@ for i in range(0, numGames):
                     #this updates the gamestate for the next player before it loops
                 else:
                     #DEBUGTEXT
-                    #print("Player action skipped because player all in or out of game")
+                    #print("Player " + str((q + 1+currentGame.currentDealer+3)%numCurPlayers) + "'s action skipped because player all in or out of game or is last player left" + " -- All In: " + str(currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].allIn) + " -- Folded: " + str(currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].inactive) + " -- Num Players: " + str(numActivePlayers))
                     continue
 
 
         collectBets()
+        if (len(listOfPlayers) == 1):
+            # if there is exactly one player left, give them the pot and break out of the round
+            listOfPlayers[0].playerMoney += currentRound.currentPot
+            currentRound.currentPot = 0
+            break
 ##        # 1) Loop through players and get actions until allBetsEqual
 ##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
 ##        for q in range(0, numCurPlayers):
@@ -728,6 +866,11 @@ for i in range(0, numGames):
         #currentGame.currentRound.printCommunityCards()
 
         collectBets()
+        if (len(listOfPlayers) == 1):
+            # if there is exactly one player left, give them the pot and break out of the round
+            listOfPlayers[0].playerMoney += currentRound.currentPot
+            currentRound.currentPot = 0
+            break
 ##        # Repeat 1
 ##        # 1) Loop through players and get actions until allBetsEqual
 ##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
@@ -756,6 +899,11 @@ for i in range(0, numGames):
         #currentGame.currentRound.printCommunityCards()
 
         collectBets()
+        if (len(listOfPlayers) == 1):
+            # if there is exactly one player left, give them the pot and break out of the round
+            listOfPlayers[0].playerMoney += currentRound.currentPot
+            currentRound.currentPot = 0
+            break
 ##        # repeat 1
 ##        # 1) Loop through players and get actions until allBetsEqual
 ##        #start at (currentDealer+3)%numCurPlayers and loop asking for actions.
@@ -785,6 +933,11 @@ for i in range(0, numGames):
 
         #collect new betting round.
         collectBets()
+        if (len(listOfPlayers) == 1):
+            # if there is exactly one player left, give them the pot and break out of the round
+            listOfPlayers[0].playerMoney += currentRound.currentPot
+            currentRound.currentPot = 0
+            break
 
 ##        #repeat 1
 ##                # 1) Loop through players and get actions until allBetsEqual
@@ -859,19 +1012,24 @@ for i in range(0, numGames):
                     currentWinner[0] = 0
 
 
-                #Add the pot to the money of whichever player has the highest.
-                numWinners = len(currentWinner)
-                perPlayerPot = currentGame.currentRound.currentPot // numWinners
-                for y in currentWinner:
-                    #give the split pot to all players splitting it
-                    currentGame.listOfPlayers[y].playerMoney += perPlayerPot
-                    currentGame.listOfPlayers[y].allIn = False
+        #Add the pot to the money of whichever player has the highest.
+        numWinners = len(currentWinner)
+        perPlayerPot = currentGame.currentRound.currentPot // numWinners
+        #print("Resolving the game with " + str(numWinners) + " winners.")
+        for y in currentWinner:
+            #give the split pot to all players splitting it
+            #DEBUG
+            #if (perPlayerPot > 80000):
+                #print("WARNING! LINE 986! AWARDING OUT OF BOUNDS POT!")
+            currentGame.listOfPlayers[y].playerMoney += perPlayerPot
+            currentGame.listOfPlayers[y].allIn = False
 
-                #print("Awarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
-                simulationOutputString += ("\n The total pot value is: $" + str(currentGame.currentRound.currentPot))
-                simulationOutputString += ("\nAwarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
-                #print("Round resolved!")
-                
+
+        #print("Awarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
+        #simulationOutputString += ("\n The total pot value is: $" + str(currentGame.currentRound.currentPot))
+        #simulationOutputString += ("\nAwarding a pot value of $" + str(perPlayerPot) + " with " + str(numWinners) + " winners!")
+        #print("Round resolved!")
+        currentRound.currentPot = 0  # RESET THE POT TO NOTHING
                 
                 
                 
@@ -884,18 +1042,28 @@ for i in range(0, numGames):
             p.allIn = False
             if (p.playerMoney <= 0):
                 #remove them for the remainder of rounds, (they will be added back into the next game)
-                simulationOutputString += ("\nRemoving a player who has: $" + str(p.playerMoney))
+                #simulationOutputString += ("\nRemoving a player who has: $" + str(p.playerMoney))
                 currentGame.listOfPlayers.remove(p)
         #print("Current Game's list of players length: " + str(len(currentGame.listOfPlayers)))
         
         #If only one player left in the list of players, break out of the loop and end the game
         if (len(currentGame.listOfPlayers) == 1):
-            #print("Game over with one player having all the money!")
-            simulationOutputString += ("\n\nGame over with one player having all the money!")
-            simulationOutputString += ("\nThe player has: $" + str(currentGame.listOfPlayers[0].playerMoney))
+            print("Game over with one player having all the money!")
+            print(str(currentGame.listOfPlayers[0].playerMoney))
+            #simulationOutputString += ("\n\nGame over with one player having all the money!")
+            #simulationOutputString += ("\nThe player has: $" + str(currentGame.listOfPlayers[0].playerMoney))
             #we have arrived at a winner, they have all the chips! No need to play more rounds, break out of the loop!
             break
         #print("J is: " + str(j))
+
+        #DEBUG MONEY COUNT
+        # moneyCheck = 0
+        # for player in currentGame.listOfPlayers:
+        #     moneyCheck += player.playerMoney
+        # print("Total Game Money for round: " + str(j) + " is $" + str(moneyCheck))
+
+
+        #simulationOutputString += ("J is: " + str(j) + ", ")
         if (j == (numRoundsPerGame-1)):
             #print the list of players and their money.
             outputString = ""
@@ -922,7 +1090,7 @@ for i in range(0, numGames):
 
 
 #print accumulated output
-#print (simulationOutputString)
+print(simulationOutputString)
 
 #DEBUG -- Below lines are for debug purposes
 print("DONE!")
