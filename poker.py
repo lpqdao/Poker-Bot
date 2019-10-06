@@ -1,13 +1,69 @@
 import random
 import itertools
 import time
+import numpy
 import threading
 import multiprocessing
 from multiprocessing import Process
+from multiprocessing import shared_memory
 import os
 
 
-def runPokerTable(self, incNumberOfGames):
+
+def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon):
+    #connect to existing shared memory
+    # newSharedMemoryBlock = shared_memory.SharedMemory(name=incSharedMemoryName)
+    #
+    # incNumpyArray = numpy.ndarray((4,5), dtype=int, buffer=newSharedMemoryBlock.buf)
+    # print(incNumpyArray)
+    # incNumpyArray[2,2] = 444
+    # print(incNumpyArray)
+
+    newSharedMemoryBlock = shared_memory.SharedMemory(name=incSharedMemoryName)
+    newSharedEpsilonBlock = shared_memory.SharedMemory(name=incSharedEpsilon)
+
+    incNumpyArray = numpy.ndarray((4, 5, 5, 7, 4, 5, 10, 9, 14), dtype=numpy.double, buffer=newSharedMemoryBlock.buf)
+    incEpsilonArray = numpy.ndarray((1), dtype=numpy.double, buffer=newSharedEpsilonBlock.buf)
+
+    #print("The shared epsilon should be readable now and it has a value of: " + str(incEpsilonArray[0]))
+    #print(incNumpyArray[2, 2])
+
+    #print(newSharedMemoryBlock)
+    #newSharedMemoryBlock[2,2] = 444
+
+
+    class QlearningStateObject:
+        #This state object contains the values for each of the dimensions that we use for state comparisons, which are as such:
+        # * Max Pairedness (4 states: 1, 2, 3, 4)
+        # * Max Suitedness (5 states: 1, 2, 3, 4, 5)
+        # * Max Straightedness (5 states: 1, 2, 3, 4, 5)
+        # * Pot odds = CurrentMaxBet/CurrentPot (7 states: >0.05, >0.10, >0.25, >0.50, >1.00, >2.00, >4.00)
+        # * Gamestage (4 states: Preflop, Flop, Turn, River)
+        # * Position (5 states: Dealer, Dealer+1, Dealer+2, Dealer+3, Dealer+4-7)
+        # * HandStrength, lower=better (10 states: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+        # * %ofTotalMoneyHeld (9 states: <10%, >10%, >15%, >25%, >40%, >60%, >75%, >90%, 100%
+
+        # For each state there are several possible actions
+        # * Fold (player folds immediately and is removed from the hand) (One Action: F)
+        # * Raise (there are six types of raises) (Six Actions: R0, R1, R2, R3, R4, R5)
+        # * Bet (there are seven types of bets) (Seven Actions: B0, B1, B2, B3, B4, B5, B6)
+        # All other actions, such as checking, can be considered one of the other actions. For example, checking is the same as betting 0 into a max bet of 0.
+        # In the (s,a) array they will be laid out in the order of [F, R0, R1, R2, R3, R4, R5, B0, B1, B2, B3, B4, B5, B6]
+
+        def __init__(self, incD0, incD1, incD2, incD3, incD4, incD5, incD6, incD7):
+            self.dim0 = incD0 #pairedness state
+            self.dim1 = incD1 #suitedness state
+            self.dim2 = incD2 #straightedness state
+            self.dim3 = incD3 #pot odds state
+            self.dim4 = incD4 #gamestage state
+            self.dim5 = incD5 #position state
+            self.dim6 = incD6 #hand strength state
+            self.dim7 = incD7 #%moneyheld state
+
+        def getDim0(self):
+            return self.dim0
+
+
 
     class Player:
 
@@ -20,9 +76,110 @@ def runPokerTable(self, incNumberOfGames):
             self.currentAI = PlayerAI(self, typeOfAI)
             self.bestHandCalculated = False
             self.handRanking.append(1000)
+            self.playerName = ("Random Player " +str(random.randint(0,10000))) # So we can identify the player
+            self.gamestate = None
+            self.lastPlayerMoney = 0
+            self.oldStates = []
+            self.oldActions = []
+
+        def addOldState(self, incOldGameState, incOldActionTaken):
+            #used for memory since we do not get reward back immediately. There should be no more than four states and actions pushed to this array every game (one for each betting round the player was a part of)
+            self.oldStates.append(incOldGameState)
+            self.oldActions.append(incOldActionTaken)
+            # self.oldStates.append(QlearningStateObject(incOldGameState.getDim0, incOldGameState.dim1, incOldGameState.dim2, incOldGameState.dim3, incOldGameState.dim4, incOldGameState.dim5, incOldGameState.dim6, incOldGameState.dim7))
+            # self.oldActions.append(incOldActionTaken)
 
         def setAI(self):
             print("Someone should have set the AI")
+
+        def constructGamestate(self, incPotOdds, incGamestage, incPlayerPosition, incCommCards):
+            #DEBUGTEXT
+            #print("Constructing the gamestate for player: " + self.playerName)
+            self.copyOfCommCards = incCommCards.copy()
+            self.fullCards = incCommCards
+            for p in self.holeCards:
+                self.fullCards.append(p)
+            #get max pairedness for D0
+            maxPairedness =  max(self.getPairedness(self.fullCards))
+            newDim0 = maxPairedness-1
+
+            #get max suitedness for D1
+            maxSuitedness = max(self.getSuitedness(self.fullCards))
+            # if (maxSuitedness > 5):
+            #     print("Uh OH, HOW DID WE GET SUITEDNESS OF MORE THAN 5? It is: " + str(maxSuitedness))
+            # it's because sometimes we check suitedness of more than 5 cards, so we could get a 6 or 7 card flush.
+            if (maxSuitedness >= 5):
+                maxSuitedness = 4
+            newDim1 = maxSuitedness
+
+            #get max straightedness for D2
+            maxStraightedness = self.getStraightedness(self.fullCards)
+            newDim2 = maxStraightedness-1
+
+            #get pot odds for D3
+            maxPotOdds = incPotOdds
+            newDim3 = 0
+            # * Pot odds = CurrentMaxBet/CurrentPot (7 states: <0.10, >0.10, >0.25, >0.50, >1.00, >2.00, >4.00)
+
+            if (maxPotOdds < 0.10):
+                newDim3 = 0
+            elif (maxPotOdds > 0.1):
+                newDim3 = 1
+            elif (maxPotOdds > 0.25):
+                newDim3 = 2
+            elif (maxPotOdds > 0.5):
+                newDim3 = 3
+            elif (maxPotOdds > 1.0):
+                newDim3 = 4
+            elif (maxPotOdds > 2.0):
+                newDim3 = 5
+            else:
+                newDim6 = 6
+
+            #get gamestage for D4
+            curGamestate = incGamestage
+            newDim4 = curGamestate
+
+            #get player position for D5
+            curPlayPosition = incPlayerPosition
+            newDim5 = 0
+            if (curPlayPosition <= 3): #if we're in position 0 to 3, we're in that state
+                newDim5 = curPlayPosition
+            else:
+                newDim5 = 4 #if we're in any other position, we're in state 4
+
+
+            #get hand strength for dimension D6
+            self.returnBestHand(self.copyOfCommCards) #cal current best hand ranking
+            curHandStrength = self.handRanking[0]-1 #set primary rank as vector value
+            newDim6 = curHandStrength
+
+            #get percentage money held for state D7
+            playerMoneyPercentage = self.playerMoney / 80000
+            percentState = 0
+            if (playerMoneyPercentage <0.1):
+                percentState = 0
+            elif (playerMoneyPercentage == 1):
+                percentState = 8
+            elif (playerMoneyPercentage > 0.9):
+                percentState = 7
+            elif (playerMoneyPercentage > 0.75):
+                percentState = 6
+            elif (playerMoneyPercentage > 0.6):
+                percentState = 5
+            elif (playerMoneyPercentage > 0.4):
+                percentState = 4
+            elif (playerMoneyPercentage > 0.25):
+                percentState = 3
+            elif (playerMoneyPercentage > 0.15):
+                percentState = 2
+            elif (playerMoneyPercentage > 0.1):
+                percentState = 1
+            newDim7 = percentState
+            newGamestate = QlearningStateObject(newDim0, newDim1, newDim2, newDim3, newDim4, newDim5, newDim6, newDim7)
+
+            #here we return the actual gamestate object we have constructed
+            return newGamestate
 
         def setCards(self, incCard1, incCard2):
             self.holeCards[:] = [] #empty old hole cards.
@@ -64,21 +221,33 @@ def runPokerTable(self, incNumberOfGames):
 
             #DEBUGTEXT
             #print("Here we find the best hand that the player has")
-            allCards = arrayOfCommunityCards
+            self.allCards = []
+            self.allCards[:] = []
+            self.allCards = arrayOfCommunityCards.copy()
+            #DEBUGTEXT
+            #print(len(self.allCards))
+            #self.allCards = arrayOfCommunityCards
             for p in self.holeCards:
-                allCards.append(p)
+                self.allCards.append(p)
+            #DEBUGTEXT
+            #print(len(self.allCards))
 
             #returns all possible combinations of 5 cards from the seven available.
-            if (len(allCards) >= 5):
+            if (len(self.allCards) >= 5):
                 #aka we have seen at least the flop
-                possibleHands = list(itertools.combinations(allCards, 5))
+                possibleHands = list(itertools.combinations(self.allCards, 5))
             else:
                 #AKA if we still have only the hole cards, then there is only one possible combination of those two
-                possibleHands = list(itertools.combinations(allCards, 2))
+                possibleHands = list(itertools.combinations(self.allCards, 2))
 
             tempHandRanking = [1000] * 6
+            #DEBUGTEXT
+            # if (len(possibleHands) > 21):
+            #     print("WARNING! THERE ARE TOO MANY POSSIBLE HANDS!: " + str(len(possibleHands)))
+
             for h in possibleHands:
                 #for each hand that is possibly the best, evaluate it and give it a ranking
+                #print("Hand Length is: " + str(len(h)))
                 intHandValue = 0
                 intHandStraightedness = self.getStraightedness(h)
                 listHandPairedness = self.getPairedness(h)
@@ -90,26 +259,36 @@ def runPokerTable(self, incNumberOfGames):
                     intHandValue+=32 #set the 6th bit to 1
                 if (self.getHighCard(h, 1, 1) == 1): #If the highest card with pairedness >=1 is ace (value 1) then set 5th bit
                     intHandValue+=16
-                suitednessHistogram = [0] * 4
-                for x in listHandSuitedness:
+                # suitednessHistogram = [0] * 4
+                # for x in listHandSuitedness:
+                #     if x == 1:
+                #         suitednessHistogram[3]+=1
+                #     elif x == 2:
+                #         suitednessHistogram[2] += 1
+                #     elif x == 3:
+                #         suitednessHistogram[1] += 1
+                #     elif x == 4:
+                #         suitednessHistogram[0] += 1
+                pairednessHistogram = [0] * 4
+                for x in listHandPairedness:
                     if x == 1:
-                        suitednessHistogram[3]+=1
+                        pairednessHistogram[3]+=1
                     elif x == 2:
-                        suitednessHistogram[2] += 1
+                        pairednessHistogram[2] += 1
                     elif x == 3:
-                        suitednessHistogram[1] += 1
+                        pairednessHistogram[1] += 1
                     elif x == 4:
-                        suitednessHistogram[0] += 1
-                if suitednessHistogram[2] == 1:
+                        pairednessHistogram[0] += 1
+                if pairednessHistogram[2] == 1:
                     #if there is exactly one pair, set the 4th bit
                     intHandValue += 8
-                if suitednessHistogram[1]==1:
+                if pairednessHistogram[1]==1:
                     #if there is exactly one triplet, set the third bit
                     intHandValue += 4
-                if suitednessHistogram[0]==1:
+                if pairednessHistogram[0]==1:
                     #if exactly one quad, set the second bit
                     intHandValue+=2
-                if suitednessHistogram[3]==1:
+                if pairednessHistogram[3]==1:
                     #if there is exactly one card that is a single, all others are paired, set the first bit
                     intHandValue+=1
 
@@ -250,15 +429,24 @@ def runPokerTable(self, incNumberOfGames):
             #declare a list/tuple with four slots
             suitednessVector = [0] * 4
             #iterate through each of the 5 cards in the incoming hand
+
+
+            #DEBUGTEXT
+            # incHandLength = len(incomingHand)
+            # if (incHandLength > 5):
+            #     print("WARNING! SUITEDNESS HAND LENGTH IS: " + str(incHandLength) + " in game: " + str(j))
+
+
             for h in incomingHand:
                 if (h.suit=="S"):
                     suitednessVector[0]+=1
                 elif (h.suit=="C"):
                     suitednessVector[1]+=1
                 elif (h.suit == "D"):
-                    suitednessVector[1] += 1
+                    suitednessVector[2] += 1
                 elif (h.suit == "H"):
-                    suitednessVector[1] += 1
+                    suitednessVector[3] += 1
+
             return suitednessVector
 
             #for each card, increment the first element if spades, second if clubs, third if diamonds, fourth if hearts
@@ -333,7 +521,7 @@ def runPokerTable(self, incNumberOfGames):
             self.parentPlayer = parentPlayer
 
         #this will need to ultimately have access to the gamestate, either by adding it to the playerAI or directly as
-        def returnAction(self):
+        def returnAction(self, incGamestate):
             if (self.name == "Default"):
                 #for now just tries to bet 0
                 return PlayerAction("B", 0)
@@ -414,9 +602,109 @@ def runPokerTable(self, incNumberOfGames):
             elif (self.name == "Player"):
                 #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                 #for now we just fold, because we have nothing
-                #returnAction = PlayerAction("F", 0)
-                #return returnAction
                 returnAction = PlayerAction("F", 0, "F")
+
+                #playerEpsilon = 0.9
+                playerEpsilon = incEpsilonArray[0]
+
+
+                #player epsilon should be global and in shared memory as a double
+                #it should start at 1, meaning we explore 100% of the time (pick randomly)
+                #every updated state should decrease epsilon by 0.0000095 such that after 100,000 state visits, it is at 5% exploration rate
+                #do not go below 5% exploration rate
+
+                #generate a random double between 0 and 1.
+                #If the number is larger than epsilon, then we pick the greedy move, otherwise we pick a random move
+
+
+
+                # This is the state we are in
+                self.dim0 = incGamestate.dim0
+                self.dim1 = incGamestate.dim1
+                self.dim2 = incGamestate.dim2
+                self.dim3 = incGamestate.dim3
+                self.dim4 = incGamestate.dim4
+                self.dim5 = incGamestate.dim5
+                self.dim6 = incGamestate.dim6
+                self.dim7 = incGamestate.dim7
+
+                dim8Width = 14
+                self.dim8 = 0
+
+
+                self.epsilonTest = random.random()  # generate random float between 0 and 1
+
+                self.intActionWeWillTake = 0 #this by default folds if we don't change it
+
+                #DEBUGTEST
+                #print("Epsilon test/Epsilon = " + str(self.epsilonTest) + "\\" + str(playerEpsilon))
+                if (self.epsilonTest > playerEpsilon):
+                    #print("WE DO THE GREEDY ACTION")
+                    # HERE WE DO THE GREEDY ACTION!
+                    # In the (s,a) array they will be laid out in the order of [F, R0, R1, R2, R3, R4, R5, B0, B1, B2, B3, B4, B5, B6]
+                    actionWithMaxValue = 0
+                    maxValueFound = 0.00
+                    for sa in range(0, dim8Width):
+                        if (incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa] > maxValueFound):
+                            actionWithMaxValue = sa
+                            maxValueFound = incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa]
+                    self.intActionWeWillTake = actionWithMaxValue
+
+                else:
+                    #print("WE EXPLORE WITH A RANDOM ACTION!")
+                    self.intActionWeWillTake = random.randint(0,14)
+
+
+                #NOW WE ACTUALLY RETURN THE APPROPRIATE ACTION
+                if (self.intActionWeWillTake == 0):
+                    # print("We do the action")
+                    return PlayerAction("F", 0, "F")
+                elif (self.intActionWeWillTake == 1):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R0")
+                elif (self.intActionWeWillTake == 2):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R1")
+                elif (self.intActionWeWillTake == 3):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R2")
+                elif (self.intActionWeWillTake == 4):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R3")
+                elif (self.intActionWeWillTake == 5):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R4")
+                elif (self.intActionWeWillTake == 6):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("R", 0, "R5")
+                elif (self.intActionWeWillTake == 7):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "B00")
+                elif (self.intActionWeWillTake == 8):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "B05")
+                elif (self.intActionWeWillTake == 9):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "B10")
+                elif (self.intActionWeWillTake == 10):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "B20")
+                elif (self.intActionWeWillTake == 11):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "B50")
+                elif (self.intActionWeWillTake == 12):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "BHP")
+                elif (self.intActionWeWillTake == 13):
+                    #print("WE DO THE ACTION")
+                    return PlayerAction("B", 0, "BFP")
+
+
+
+                #Check the state that we are in,
+
+
+                return returnAction
 
                 #INSERT PLAYER CODE ACTIONS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             else:
@@ -722,10 +1010,49 @@ def runPokerTable(self, incNumberOfGames):
                 self.actAction = incAction
                 self.actAmt = incAmt
                 self.actSub = incSubAction
+                self.actIntValue = 0
+                self.setPlayerActionInt()
+
             else:
                 self.actAction = "F"
                 self.actAmt = 0
                 self.actSub = "F"
+                self.actIntValue = 0
+        def setPlayerActionInt(self):
+            if(self.actAction=="F"):
+                self.actIntValue = 0
+            elif(self.actAction=="R"):
+                #check subraises
+                if(self.actSub == "R0"):
+                    self.actIntValue = 1
+                elif (self.actSub == "R1"):
+                    self.actIntValue = 2
+                elif (self.actSub == "R2"):
+                    self.actIntValue = 3
+                elif (self.actSub == "R3"):
+                    self.actIntValue = 4
+                elif (self.actSub == "R4"):
+                    self.actIntValue = 5
+                elif (self.actSub == "R5"):
+                    self.actIntValue = 6
+            elif(self.actAction =="B"):
+                if (self.actSub == "B00"):
+                    self.actIntValue = 7
+                elif (self.actSub == "B05"):
+                    self.actIntValue = 8
+                elif (self.actSub == "B10"):
+                    self.actIntValue = 9
+                elif (self.actSub == "B20"):
+                    self.actIntValue = 10
+                elif (self.actSub == "B50"):
+                    self.actIntValue = 11
+                elif (self.actSub == "BHP"):
+                    self.actIntValue = 12
+                elif (self.actSub == "BFP"):
+                    self.actIntValue = 13
+            else:
+                self.actIntValue = 0
+                #we fold because we got passed some BS
     #Initialize the new tournament
 
 
@@ -739,27 +1066,37 @@ def runPokerTable(self, incNumberOfGames):
 
     #DEBUG
     start = time.time()
-
+    strFinalResults1 = "RESULTS: \n LearnerBot1 Scores: "
+    strFinalResults2 = "RESULTS: \n LearnerBot2 Scores: "
     #start the games +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     for i in range(0, numGames):
         #define a list to store the current players (each game has a unique set of players)
         listOfPlayers = []
         listOfPlayers[:] = []
         #set player loop (1 to 8, if not specified, pick at random)
-        for u in range(0, 8):
+        listOfPlayers.append(Player("Player"))
+        listOfPlayers[0].playerName = "LearnerBot1"
+        listOfPlayers.append(Player("Player"))
+        listOfPlayers[1].playerName = "LearnerBot2"
+        for u in range(0, 6):
             #print("I have set player " + str(u))
             #create 8 players, ALL RANDOM FOR NOW
             listOfPlayers.append(Player("Random"))
+        random.shuffle(listOfPlayers) #shuffle the list of players so the learning bots aren't always in the same initial position
         currentGame = Game(listOfPlayers)
 
         #start the rounds ----------------------------------------------------------------------------------------
+        #DEBUGTEXT
         #print("\n\nBEGIN GAME NUMBER: " + str(i+1))
         #simulationOutputString += ("\n\nBEGIN GAME NUMBER: " + str(i+1))
         for j in range(0, numRoundsPerGame):
             currentRound = Round()
+            #DEBUGTEXT
+            #print("\n Begin round number: " + str(j))
 
             #currentGame.setNewRound(currentRound)
             currentGame.setNewRound(Round())
+            curGamestage = 0
 
             #start the game
 
@@ -785,6 +1122,7 @@ def runPokerTable(self, incNumberOfGames):
             for p in currentGame.listOfPlayers:
                 if (p.inactive == False):
                     p.drawCards(currentGame.currentRound.deck)
+                    p.lastPlayerMoney = p.playerMoney
 
             #d.printRemainingDeck() #Prints the remaining cards
 
@@ -812,6 +1150,7 @@ def runPokerTable(self, incNumberOfGames):
                     if (currentGame.listOfPlayers[z].inactive == False and currentGame.listOfPlayers[z].allIn == False):
                         numActivePlayers += 1
                 for q in range(0, numCurPlayers):
+                    #DEBUGTEXT
                     #print("Get the action from player and update gamestate")
                     #standinForGamestate = []
                     if ((currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].inactive == False) and (currentGame.listOfPlayers[q].allIn == False) and (numActivePlayers > 1)):
@@ -823,11 +1162,28 @@ def runPokerTable(self, incNumberOfGames):
                         #newPlayerAction = p.currentAI.returnAction(standinForGamestate)
                         #ask for the action, give current gamestate including cards, pot size, bets, stack sizes, etc.
                         #newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(standinForGamestate)
-                        newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction()
+
+                        #First we construct the gamestate for a particular player (if they are not a random player) then we pass it to them so they can make their move.
+
+                        #we do this in the loop because each player's bet can affect the pot odds for future players
+                        calcPotOdds = currentGame.currentRound.maximumBet / currentGame.currentRound.currentPot
+                        #DEBUGTEXT
+                        #print("Asking the player to generate their gamestate passing in an array of community cards of length: " + str(len(currentGame.currentRound.communityCards)))
+                        currentPlayerGamestate = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].constructGamestate(calcPotOdds, curGamestage, ((q+currentGame.currentDealer+3)%numCurPlayers), currentGame.currentRound.communityCards.copy())
+
+                        newPlayerAction = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.returnAction(currentPlayerGamestate)
                         #print("Implement the action from the player")
                         currentPlayer = currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers]
                         #implement the action in the game engine // If the action is invalid, the player folds
                         currentGame.implementAction(newPlayerAction, currentPlayer, currentGame.listOfPlayers.index(currentPlayer))
+
+                        #I did an action, so if this is a player (Q learning) and not a random bot, then I need to record the action
+                        if (currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.name == "Player"):
+                            #Then this is a learning player, so we should update the list of Q action pairs it's been in
+                            currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].addOldState(currentPlayerGamestate, newPlayerAction.actIntValue)
+                            #currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldStates.append(currentPlayerGamestate)
+                            #currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldActions.append(newPlayerAction.actIntValue)
+
                         #this updates the gamestate for the next player before it loops
                     else:
                         #DEBUGTEXT
@@ -870,6 +1226,7 @@ def runPokerTable(self, incNumberOfGames):
             for f in range(0,3):
                 currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
             currentGame.currentRound.resetBets()
+            curGamestage = 1 #at post flop gamestage
             #DEBUGTEXT
             #currentGame.currentRound.printCommunityCards()
 
@@ -903,6 +1260,7 @@ def runPokerTable(self, incNumberOfGames):
             # Turn revealed
             currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
             currentGame.currentRound.resetBets()
+            curGamestage = 2 # at the post turn gamestage
             #DEBUGTEXT
             #currentGame.currentRound.printCommunityCards()
 
@@ -936,6 +1294,7 @@ def runPokerTable(self, incNumberOfGames):
             # river revealed
             currentGame.currentRound.communityCards.append(currentGame.currentRound.deck.drawACard())
             currentGame.currentRound.resetBets()
+            curGamestage = 3 #at the post river gamestage
             #DEBUGTEXT
             #currentGame.currentRound.printCommunityCards()
 
@@ -1048,6 +1407,66 @@ def runPokerTable(self, incNumberOfGames):
             for p in currentGame.listOfPlayers:
                 p.inactive = False
                 p.allIn = False
+
+                #money has been awarded, so if this is a player (Q learning) bot, then update Q states using the old
+                # state/action pairs that were saved in the player
+
+                #if (currentGame.listOfPlayers[(q+currentGame.currentDealer+3)%numCurPlayers].currentAI.name == "Player"):
+                if (p.currentAI.name == "Player"):
+                    #we are a Q learning bot
+                    calculatedReward = p.playerMoney - p.lastPlayerMoney
+                    #this is the money they have now, minus the money they had at the start of the round
+                    #this is positive if they won money, negative if they lost money
+
+                    intNumStatesExamined = 0
+                    #DEBUGTEXT
+                    #print("The length is: " + str(len(p.oldStates)))
+
+                    for sapair in reversed(range(0, len(p.oldStates))):
+                        #print("")
+                        #print(type(p.oldStates[sapair]))
+                        #print(p.oldStates[sapair])
+
+                        dim0 = p.oldStates[sapair].dim0
+                        dim1 = p.oldStates[sapair].dim1
+                        dim2 = p.oldStates[sapair].dim2
+                        dim3 = p.oldStates[sapair].dim3
+                        dim4 = p.oldStates[sapair].dim4
+                        dim5 = p.oldStates[sapair].dim5
+                        dim6 = p.oldStates[sapair].dim6
+                        dim7 = p.oldStates[sapair].dim7
+                        dim8 = p.oldActions[sapair] #this should be the integer action value
+
+                        #get the old state, and the old action using the integer index "sapair"
+                        #it is counting down in reverse order, so newest actions first, oldest last
+                        #the decay for each action should be 0.6^x where x is the number of actions back it was, less 1
+                        #thus the first action should get full value, second should get 0.6, third 0.36, etc
+
+                        currentQsa = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8]
+                        foundMaxQsa = 0.00
+
+                        #FIND THE MAX EXPECTED VALUE FOR ALL ACTIONS IN THAT STATE
+                        actionWithMaxValue = 0
+
+                        for actForState in range(0, 14):
+                            if (incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState] > foundMaxQsa):
+                                actionWithMaxValue = actForState
+                                foundMaxQsa = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState]
+
+                        newQsa = currentQsa + (0.05)*( ((calculatedReward * (0.6 ** intNumStatesExamined))) + (0.9 * foundMaxQsa) - currentQsa) #this decays the reward, the further back we go
+
+                        incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8] = (newQsa)
+                        #We just updated a Q(s,a), so we should decrease epsilon, as long as it doesn't go below the minimum
+                        if(incEpsilonArray[0] > 0.05):
+                            incEpsilonArray[0] -= 0.0000095 #At this rate, we should reach epsilon of 5% after 100,000 updates to the policy.
+                            #EPSILON DECAY
+
+                        intNumStatesExamined += 1
+                    #now that I have looped through all the states and updated the Q values, erase the old states!
+                    p.oldStates.clear()
+                    p.oldActions.clear()
+
+
                 if (p.playerMoney <= 0):
                     #remove them for the remainder of rounds, (they will be added back into the next game)
                     #simulationOutputString += ("\nRemoving a player who has: $" + str(p.playerMoney))
@@ -1090,13 +1509,23 @@ def runPokerTable(self, incNumberOfGames):
             currentGame.currentDealer = (currentGame.currentDealer + 1)%numCurPlayers
             currentGame.currentRound.currentPot = 0
             currentWinner[:] = [] #delete the winner list
-
-
-        #HERE IS THE END OF THIS GAME
-
-        #There should be some code here to collect the final state of the game, such as the amount of money held by each player (could be 80,000 by 1, 0 by the rest, etc)
-        #INSERT SOME CODE TO DELETE THE CURRENT GAM
-
+        #this is code inside the game, but outside the round
+        intLearnBotCount1 = 0
+        intLearnBotCount2 = 0
+        for activePlayer in currentGame.listOfPlayers:
+            if (activePlayer.playerName == "LearnerBot1"):
+                strFinalResults1 += ("$" + str(activePlayer.playerMoney) + ", ")
+                intLearnBotCount1 += 1
+            elif (activePlayer.playerName == "LearnerBot2"):
+                strFinalResults2 += ("$" + str(activePlayer.playerMoney) + ", ")
+                intLearnBotCount2 += 1
+        if intLearnBotCount1 == 0:
+            strFinalResults1 += "$0, "
+        if intLearnBotCount2 == 0:
+            strFinalResults2 += "$0, "
+    print(strFinalResults1)
+    print(strFinalResults2)
+    #HERE IS THE END OF THIS GAME
 
     #print accumulated output
     print(simulationOutputString)
@@ -1109,7 +1538,7 @@ def runPokerTable(self, incNumberOfGames):
 #runPokerTable()
 
 simStart = time.time()
-numThreads = 1
+numThreads = 14
 threadList = []
 # for y in range(0, numThreads):
 #     threadList.append(threading.Thread(target=runPokerTable))
@@ -1126,10 +1555,71 @@ def info(title):
         print('parent process:', os.getppid())
     print('process id:', os.getpid())
 
+
+testnpArray = numpy.zeros((4,5), dtype=int)
+
+#construct the gigantic array
+fullSAArray = numpy.zeros((4, 5, 5, 7, 4, 5, 10, 9, 14), dtype=numpy.double)
+
+#this is the global learning rate for epsilon greedy learning
+globalEpsilon = numpy.zeros((1), dtype=numpy.double)
+globalEpsilon[0] = 1.00
+
+#this should be shared memory
+sharedMemoryBlock = multiprocessing.shared_memory.SharedMemory(create=True, size=testnpArray.nbytes)
+
+#create the gigantic block of shared memory
+fullSharedStateArray = multiprocessing.shared_memory.SharedMemory(create=True, size=fullSAArray.nbytes)
+
+#this is the shared epsilon memory
+sharedEpsilon = multiprocessing.shared_memory.SharedMemory(create=True, size=globalEpsilon.nbytes)
+
+#this is the test one
+newNumpyArray = numpy.ndarray(testnpArray.shape, dtype=testnpArray.dtype, buffer=sharedMemoryBlock.buf)
+
+#this is the real one
+fullNumpyArray = numpy.ndarray(fullSAArray.shape, dtype=fullSAArray.dtype, buffer=fullSharedStateArray.buf)
+
+#this is the epsilon share linking
+epsilonArray = numpy.ndarray(globalEpsilon.shape, dtype=globalEpsilon.dtype, buffer=sharedEpsilon.buf)
+
+newNumpyArray[:] = testnpArray[:] #copy the array
+
+fullNumpyArray[:] = fullSAArray[:] #copies the array
+
+epsilonArray[:] = globalEpsilon[:] #copy the value (which should be 1)
+#print("The next print should just have 1.00000")
+#print(epsilonArray)
+
+sharedMemoryName = sharedMemoryBlock.name
+
+sharedFullStateArrayName = fullSharedStateArray.name
+
+sharedEpsilonName = sharedEpsilon.name
+
+
+
+newNumpyArray[2, 2] = 555
+#update the list
+#print(newNumpyArray)
+#this should print the list
+
+#print(sharedMemoryName)
+
+
+#create the shared memory outside of the process
+
+#spawn all the processes
+
+#they should all have access to this memory block from within the processes
+
+
+
+
 if __name__ == '__main__':
     info('main line')
     for y in range(0, numThreads):
-        threadList.append(Process(target=runPokerTable, args=(("PokerTable " + str(y)), 10)))
+        threadList.append(Process(target=runPokerTable, args=(("PokerTable " + str(y)), 1000, sharedFullStateArrayName, sharedEpsilonName)))
         threadList[y].start()
 
 
@@ -1139,3 +1629,6 @@ for process in threadList:
 
     simEnd = time.time()
     print("Simulation time:" + str(simEnd - simStart))
+
+
+del(sharedMemoryBlock)
