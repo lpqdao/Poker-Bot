@@ -1179,6 +1179,7 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
     start = time.time()
     strFinalResults1 = "RESULTS: \n LearnerBot1 Scores: "
     strFinalResults2 = "RESULTS: \n LearnerBot2 Scores: "
+    strFinalResults3 = "RESULTS: \n LearnerBot4 Scores: "
     #start the games +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     for i in range(0, numGames):
         #define a list to store the current players (each game has a unique set of players)
@@ -1186,9 +1187,13 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
         listOfPlayers[:] = []
         #set player loop (1 to 8, if not specified, pick at random)
         listOfPlayers.append(Player("Player"))
+        listOfPlayers.append(Player("Grace-Player"))
         listOfPlayers[0].playerName = "LearnerBot1"
         listOfPlayers.append(Player("Player"))
+        listOfPlayers.append(Player("Grace-Player"))
         listOfPlayers[1].playerName = "LearnerBot2"
+        listOfPlayers[2].playerName="LearnerBot3"
+        listOfPlayers[3].playerName= "LearnerBot4"
         for u in range(0, 6):
             #print("I have set player " + str(u))
             #create 8 players, ALL RANDOM FOR NOW
@@ -1607,7 +1612,7 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
                         #the decay for each action should be 0.6^x where x is the number of actions back it was, less 1
                         #thus the first action should get full value, second should get 0.6, third 0.36, etc
 
-                        currentVs = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8]
+                        currentVs = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, 0]
                         #foundMaxVs = 0.00
 
 
