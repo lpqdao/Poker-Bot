@@ -712,8 +712,8 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
                 #for now we just fold, because we have nothing
                 returnAction = PlayerAction("F", 0, "F")
 
-                #playerEpsilon = 0.9
-                #playerEpsilon = incEpsilonArray[0]
+                playerEpsilon = 0.9
+                playerEpsilon = incEpsilonArray[0]
 
 
                 #player epsilon should be global and in shared memory as a double
@@ -751,13 +751,14 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
                     #print("WE DO THE GREEDY ACTION")
                     # HERE WE DO THE GREEDY ACTION!
                     # In the (s,a) array they will be laid out in the order of [F, R0, R1, R2, R3, R4, R5, B0, B1, B2, B3, B4, B5, B6]
-                    #actionWithMaxValue = 0
-                    #maxValueFound = 0.00
-                    #for sa in range(0, dim8Width):
-                    #    if (incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa] > maxValueFound):
-                     #       actionWithMaxValue = sa
-                     #       maxValueFound = incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa]
-                    #self.intActionWeWillTake = actionWithMaxValue
+                    actionWithMaxValue = 0
+                    maxValueFound = 0.00
+                    for sa in range(0, dim8Width):
+                        actionWithMaxValue=sa
+                        #if (incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa] > maxValueFound):
+                            #actionWithMaxValue = sa
+                    maxValueFound = incNumpyArray[self.dim0, self.dim1, self.dim2, self.dim3, self.dim4, self.dim5, self.dim6, self.dim7, sa]
+                    self.intActionWeWillTake = actionWithMaxValue
 
                 else:
                     #print("WE EXPLORE WITH A RANDOM ACTION!")
@@ -1619,29 +1620,30 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
                         #the decay for each action should be 0.6^x where x is the number of actions back it was, less 1
                         #thus the first action should get full value, second should get 0.6, third 0.36, etc
 
-                        currentVs = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, 0]
-                        #foundMaxVs = 0.00
+                        currentQsa = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8]
+                        foundMaxQsa = 0.00
 
-
-                        #FIND THE MAX EXPECTED VALUE FOR ALL ACTIONS IN THAT STATE
+                        # FIND THE MAX EXPECTED VALUE FOR ALL ACTIONS IN THAT STATE
                         actionWithMaxValue = 0
 
-                        #for actForState in range(0, 14):
-                        #    if (incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState] > foundMaxVs):
-                        #        actionWithMaxValue = actForState
-                                #foundMaxQsa = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState]
-                        Vsnew = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, 0]
+                        for actForState in range(0, 14):
+                            #if (incNumpyArray[
+                             #   dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState] > foundMaxQsa):
+                            actionWithMaxValue = actForState
+                            foundMaxQsa = incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, actForState]
 
-                        newVs = currentVs + (0.05)*( ((calculatedReward * (0.6 ** intNumStatesExamined))) + (0.9 * Vsnew) - currentVs) #this decays the reward, the further back we go
+                        newQsa = currentQsa + (0.05) * (((calculatedReward * (0.6 ** intNumStatesExamined))) + (
+                                    0.9 * foundMaxQsa) - currentQsa)  # this decays the reward, the further back we go
 
-                        incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8] = (newVs)
-                        #We just updated a Q(s,a), so we should decrease epsilon, as long as it doesn't go below the minimum
-                        if(incEpsilonArray[0] > 0.05):
-                            incEpsilonArray[0] -= 0.0000095 #At this rate, we should reach epsilon of 5% after 100,000 updates to the policy.
-                            #EPSILON DECAY
+                        incNumpyArray[dim0, dim1, dim2, dim3, dim4, dim5, dim6, dim7, dim8] = (newQsa)
+                        # We just updated a Q(s,a), so we should decrease epsilon, as long as it doesn't go below the minimum
+                        if (incEpsilonArray[0] > 0.05):
+                            incEpsilonArray[
+                                0] -= 0.0000095  # At this rate, we should reach epsilon of 5% after 100,000 updates to the policy.
+                            # EPSILON DECAY
 
                         intNumStatesExamined += 1
-                    #now that I have looped through all the states and updated the Q values, erase the old states!
+                        # now that I have looped through all the states and updated the Q values, erase the old states!
                     p.oldStates.clear()
                     p.oldActions.clear()
 
