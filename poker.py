@@ -1186,10 +1186,10 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
         listOfPlayers = []
         listOfPlayers[:] = []
         #set player loop (1 to 8, if not specified, pick at random)
-        listOfPlayers.append(Player("Player"))
+        #listOfPlayers.append(Player("Player"))
         listOfPlayers.append(Player("Grace-Player"))
         listOfPlayers[0].playerName = "LearnerBot1"
-        listOfPlayers.append(Player("Player"))
+        #listOfPlayers.append(Player("Player"))
         listOfPlayers.append(Player("Grace-Player"))
         listOfPlayers[1].playerName = "LearnerBot2"
         listOfPlayers[2].playerName="LearnerBot3"
@@ -1299,6 +1299,13 @@ def runPokerTable(self, incNumberOfGames, incSharedMemoryName, incSharedEpsilon)
                             currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].addOldState(currentPlayerGamestate, newPlayerAction.actIntValue)
                             #currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldStates.append(currentPlayerGamestate)
                             #currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldActions.append(newPlayerAction.actIntValue)
+                        if (currentGame.listOfPlayers[
+                            (q + currentGame.currentDealer + 3) % numCurPlayers].currentAI.name == "Grace-Player"):
+                            # Then this is a learning player, so we should update the list of Q action pairs it's been in
+                            currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].addOldState(
+                                currentPlayerGamestate, newPlayerAction.actIntValue)
+                            # currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldStates.append(currentPlayerGamestate)
+                            # currentGame.listOfPlayers[(q + currentGame.currentDealer + 3) % numCurPlayers].oldActions.append(newPlayerAction.actIntValue)
 
                         #this updates the gamestate for the next player before it loops
                     else:
